@@ -1,0 +1,101 @@
+#!/bin/bash
+set -euo pipefail
+
+CCM_VERSION="0.1.0"
+CCM_REPO="${CCM_REPO:-yves-s/claude-context-manager}"
+
+# Path resolution: installed mode (~/.ccm/) vs development mode (repo)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/../lib/config.sh" ]]; then
+  # Development mode: running from repo bin/
+  LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
+  TEMPLATES_DIR="$(dirname "$SCRIPT_DIR")/templates"
+else
+  # Installed mode: binary in /usr/local/bin, assets in ~/.ccm/
+  LIB_DIR="$HOME/.ccm/lib"
+  TEMPLATES_DIR="$HOME/.ccm/templates"
+fi
+
+CCM_HOME="${CCM_HOME:-$HOME/.ccm}"
+# shellcheck source=../lib/config.sh
+source "$LIB_DIR/config.sh"
+
+cmd_init() {
+  if [[ "${CCM_NON_INTERACTIVE:-}" == "1" ]]; then
+    GITHUB_USER="$CCM_GITHUB_USER"
+    PROJECT_NAME="$CCM_PROJECT_NAME"
+    NOTION_ENABLED="${CCM_NOTION:-false}"
+  else
+    echo "🚀 CCM — Meta-Repo Setup"
+    echo "========================"
+    read -rp "GitHub Username oder Organisation: " GITHUB_USER
+    [[ -z "$GITHUB_USER" ]] && { echo "❌ Erforderlich."; exit 1; }
+    read -rp "Projektname: " PROJECT_NAME
+    PROJECT_NAME="${PROJECT_NAME:-Mein Projekt}"
+    read -rp "Notion-Integration aktivieren? (y/n): " _NOTION
+    [[ "$_NOTION" == "y" ]] && NOTION_ENABLED=true || NOTION_ENABLED=false
+  fi
+
+  REPO_NAME=$(basename "$(pwd)")
+  META_REPO_URL="git@github.com:$GITHUB_USER/$REPO_NAME.git"
+
+  # context/ — only copy if not already present (idempotency)
+  if [[ ! -d "context" ]]; then
+    cp -r "$TEMPLATES_DIR/meta/context" .
+  fi
+
+  # CLAUDE.md — always regenerate from template (contains meta config)
+  sed \
+    -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
+    -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
+    -e "s|{{META_REPO_URL}}|$META_REPO_URL|g" \
+    "$TEMPLATES_DIR/meta/CLAUDE.md" > CLAUDE.md
+
+  # ccm.json — only create if not already present
+  if [[ ! -f "ccm.json" ]]; then
+    sed \
+      -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
+      -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
+      -e "s|{{META_REPO_URL}}|$META_REPO_URL|g" \
+      -e "s|{{NOTION_ENABLED}}|$NOTION_ENABLED|g" \
+      "$TEMPLATES_DIR/meta/ccm.json" > ccm.json
+  fi
+
+  # GitHub Action workflow
+  mkdir -p .github/workflows
+  sed -e "s|{{CCM_REPO}}|$CCM_REPO|g" \
+    "$TEMPLATES_DIR/meta/github-workflow.yml" > .github/workflows/sync.yml
+
+  # Register in global config
+  set_meta_repo "$(pwd)"
+
+  echo ""
+  echo "✅ Meta-Repo konfiguriert"
+  echo "   Projekt:  $PROJECT_NAME"
+  echo "   GitHub:   $GITHUB_USER"
+  echo ""
+  echo "Nächste Schritte:"
+  echo "  1. context/ Dateien anpassen"
+  echo "  2. git remote add origin $META_REPO_URL"
+  echo "  3. git push -u origin main"
+  echo "  4. Sub-Projekt hinzufügen: ccm add (im Sub-Repo)"
+}
+
+cmd_add() {
+  # defined in Task 7 — placeholder to satisfy router
+  echo "cmd_add not yet implemented" && exit 1
+}
+
+case "${1:-}" in
+  init)    cmd_init ;;
+  add)     cmd_add ;;
+  version) echo "ccm $CCM_VERSION" ;;
+  *)
+    echo "Usage: ccm <command>"
+    echo ""
+    echo "Commands:"
+    echo "  init     Meta-Repo im aktuellen Verzeichnis einrichten"
+    echo "  add      Dieses Projekt als Sub-Repo registrieren"
+    echo "  version  Version anzeigen"
+    ;;
+esac
