@@ -1,0 +1,57 @@
+name: CCM Sync (Reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout meta-repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout CCM tools
+        uses: actions/checkout@v4
+        with:
+          repository: yves-s/claude-context-manager
+          path: .ccm-tools
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Sync CLAUDE.md to sub-repos
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          MERGE_SH=".ccm-tools/lib/merge.sh"
+          SUB_COUNT=$(jq '.sub_projects | length' ccm.json)
+          if [[ "$SUB_COUNT" == "0" ]]; then
+            echo "No sub-projects registered."
+            exit 0
+          fi
+          for i in $(seq 0 $((SUB_COUNT - 1))); do
+            REPO=$(jq -r ".sub_projects[$i].repo" ccm.json)
+            MARKER=$(jq -r ".sub_projects[$i].marker" ccm.json)
+            REPO_NAME=$(basename "$REPO" .git)
+            echo "→ Syncing $REPO_NAME"
+            git clone --depth 1 \
+              "https://x-access-token:${GH_TOKEN}@${REPO#git@github.com:}" \
+              "/tmp/$REPO_NAME" 2>/dev/null \
+              || { echo "  ⚠ Could not clone $REPO — skipping"; continue; }
+            bash "$MERGE_SH" CLAUDE.md "/tmp/$REPO_NAME/CLAUDE.md" "$MARKER"
+            cd "/tmp/$REPO_NAME"
+            if git diff --quiet CLAUDE.md; then
+              echo "  ✅ Already up to date"
+            else
+              git config user.email "ccm-bot@users.noreply.github.com"
+              git config user.name "CCM Sync Bot"
+              git add CLAUDE.md
+              git commit -m "chore: sync CLAUDE.md from meta-repo [skip ci]"
+              git push
+              echo "  ✅ Synced"
+            fi
+            cd -
+          done
