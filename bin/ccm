@@ -10,14 +10,20 @@ if [[ -f "$SCRIPT_DIR/../lib/config.sh" ]]; then
   # Development mode: running from repo bin/
   LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
   TEMPLATES_DIR="$(dirname "$SCRIPT_DIR")/templates"
+  HOOKS_DIR="$(dirname "$SCRIPT_DIR")/hooks"
 else
-  # Installed mode: binary in /usr/local/bin, assets in ~/.ccm/
+  # Installed mode: binary in ~/.local/bin, assets in ~/.ccm/
   LIB_DIR="$HOME/.ccm/lib"
   TEMPLATES_DIR="$HOME/.ccm/templates"
+  HOOKS_DIR="$HOME/.ccm/hooks"
 fi
 
 # shellcheck source=../lib/config.sh
 source "$LIB_DIR/config.sh"
+# shellcheck source=../lib/buffer.sh
+source "$LIB_DIR/buffer.sh"
+# shellcheck source=../lib/flush.sh
+source "$LIB_DIR/flush.sh"
 
 cmd_init() {
   if [[ "${CCM_NON_INTERACTIVE:-}" == "1" ]]; then
@@ -78,6 +84,10 @@ cmd_init() {
   echo "  2. git remote add origin $META_REPO_URL"
   echo "  3. git push -u origin main"
   echo "  4. Sub-Projekt hinzufügen: ccm add (im Sub-Repo)"
+}
+
+cmd_flush() {
+  flush_buffer
 }
 
 cmd_add() {
@@ -149,6 +159,8 @@ cmd_add() {
 case "${1:-}" in
   init)    cmd_init ;;
   add)     cmd_add ;;
+  flush)   cmd_flush ;;
+  hooks)   cmd_hooks "${2:-}" ;;
   version) echo "ccm $CCM_VERSION" ;;
   *)
     echo "Usage: ccm <command>"
@@ -156,6 +168,8 @@ case "${1:-}" in
     echo "Commands:"
     echo "  init     Meta-Repo im aktuellen Verzeichnis einrichten"
     echo "  add      Dieses Projekt als Sub-Repo registrieren"
+    echo "  flush    Buffer klassifizieren und in Memory/Meta-Repo schreiben"
+    echo "  hooks    Hook-Management (install)"
     echo "  version  Version anzeigen"
     ;;
 esac
