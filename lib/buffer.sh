@@ -1,5 +1,3 @@
-#!/bin/bash
-
 CCM_HOME="${CCM_HOME:-$HOME/.ccm}"
 CCM_BUFFER="${CCM_BUFFER:-$CCM_HOME/buffer.jsonl}"
 
