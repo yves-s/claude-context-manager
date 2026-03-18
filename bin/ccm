@@ -156,6 +156,11 @@ cmd_add() {
   echo "  3. git push → Meta-Repo Action synct künftig automatisch"
 }
 
+cmd_hooks() {
+  echo "ccm hooks: not yet implemented" >&2
+  exit 1
+}
+
 case "${1:-}" in
   init)    cmd_init ;;
   add)     cmd_add ;;
