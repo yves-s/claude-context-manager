@@ -3,7 +3,7 @@ set -euo pipefail
 
 CCM_REPO="${CCM_REPO:-yves-s/claude-context-manager}"
 CCM_RAW="${CCM_RAW:-https://raw.githubusercontent.com/$CCM_REPO/main}"
-INSTALL_DIR="${CCM_INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${CCM_INSTALL_DIR:-$HOME/.local/bin}"
 
 echo "Installing ccm..."
 
@@ -14,6 +14,7 @@ for dep in git jq; do
   fi
 done
 
+mkdir -p "$INSTALL_DIR"
 curl -fsSL "$CCM_RAW/bin/ccm" -o "$INSTALL_DIR/ccm"
 chmod +x "$INSTALL_DIR/ccm"
 
@@ -34,6 +35,11 @@ done
 
 echo "✅ ccm installed to $INSTALL_DIR/ccm"
 echo ""
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+  echo "⚠️  Add to your PATH (add to ~/.zshrc or ~/.bashrc):"
+  echo "   export PATH=\"\$HOME/.local/bin:\$PATH\""
+  echo ""
+fi
 echo "Get started:"
 echo "  mkdir my-project-meta && cd my-project-meta && git init"
 echo "  ccm init"
