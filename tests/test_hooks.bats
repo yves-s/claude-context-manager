@@ -40,6 +40,15 @@ _run_post_tool_use() {
   [ "$output" = "Write" ]
 }
 
+@test "post-tool-use: appends entry for NotebookEdit tool with notebook_path" {
+  _run_post_tool_use '{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"/tmp/nb.ipynb"}}'
+  [ -f "$CCM_HOME/buffer.jsonl" ]
+  run jq -r '.tool' "$CCM_HOME/buffer.jsonl"
+  [ "$output" = "NotebookEdit" ]
+  run jq -r '.file' "$CCM_HOME/buffer.jsonl"
+  [ "$output" = "/tmp/nb.ipynb" ]
+}
+
 @test "post-tool-use: entry contains file path" {
   _run_post_tool_use '{"tool_name":"Edit","tool_input":{"file_path":"/tmp/myfile.sh"}}'
   run jq -r '.file' "$CCM_HOME/buffer.jsonl"

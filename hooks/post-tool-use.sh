@@ -12,7 +12,7 @@ case "$TOOL_NAME" in
   *) exit 0 ;;
 esac
 
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // ""')
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.notebook_path // ""')
 PROJECT=$(pwd)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
