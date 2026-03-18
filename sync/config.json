@@ -1,0 +1,13 @@
+{
+  "meta_repo": "",
+  "github_user": "",
+  "notion": {
+    "enabled": false,
+    "instruction": "Notion ist die Source of Truth für dynamischen Projektstatus. Relevante Seiten bei Bedarf via Notion-MCP abrufen."
+  },
+  "sub_projects": [],
+  "auto_sync_rules": {
+    "trigger_on_push": true,
+    "create_pr_for_sub_changes": true
+  }
+}
