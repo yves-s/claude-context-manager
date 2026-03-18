@@ -66,3 +66,35 @@ _run_post_tool_use() {
   run jq -r '.project' "$CCM_HOME/buffer.jsonl"
   [ -n "$output" ]
 }
+
+# Note: same pattern — CCM_HOME on bash subprocess, not on echo.
+_run_stop() {
+  echo '{"stop_hook_active":true}' \
+    | CCM_HOME="$CCM_HOME" bash "$BATS_TEST_DIRNAME/../hooks/stop.sh"
+}
+
+@test "stop: appends session_end entry to buffer" {
+  _run_stop
+  [ -f "$CCM_HOME/buffer.jsonl" ]
+  run jq -r '.type' "$CCM_HOME/buffer.jsonl"
+  [ "$output" = "session_end" ]
+}
+
+@test "stop: entry contains timestamp" {
+  _run_stop
+  run jq -r '.timestamp' "$CCM_HOME/buffer.jsonl"
+  [[ "$output" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2} ]]
+}
+
+@test "stop: entry contains project path" {
+  _run_stop
+  run jq -r '.project' "$CCM_HOME/buffer.jsonl"
+  [ -n "$output" ]
+}
+
+@test "stop: multiple invocations accumulate in buffer" {
+  _run_stop
+  _run_stop
+  run grep -c '"session_end"' "$CCM_HOME/buffer.jsonl"
+  [ "$output" = "2" ]
+}
