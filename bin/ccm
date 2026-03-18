@@ -16,7 +16,6 @@ else
   TEMPLATES_DIR="$HOME/.ccm/templates"
 fi
 
-CCM_HOME="${CCM_HOME:-$HOME/.ccm}"
 # shellcheck source=../lib/config.sh
 source "$LIB_DIR/config.sh"
 
