@@ -2,6 +2,8 @@
 
 # {{REPO_NAME}} — Projekt-Kontext
 
+**Repo:** {{REPO_URL}}
+
 > Alles unterhalb dieses Markers ist projektspezifisch und wird beim Meta-Sync NICHT überschrieben.
 
 ## Projektbeschreibung
