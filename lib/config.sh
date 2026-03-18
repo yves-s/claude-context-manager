@@ -17,6 +17,6 @@ set_meta_repo() {
     jq --arg p "$path" '.default_meta = $p' "$CCM_GLOBAL_CONFIG" \
       > "$CCM_GLOBAL_CONFIG.tmp" && mv "$CCM_GLOBAL_CONFIG.tmp" "$CCM_GLOBAL_CONFIG"
   else
-    echo "{\"default_meta\": \"$path\"}" > "$CCM_GLOBAL_CONFIG"
+    jq -n --arg p "$path" '{default_meta: $p}' > "$CCM_GLOBAL_CONFIG"
   fi
 }
