@@ -1,0 +1,9 @@
+{
+  "project": "{{PROJECT_NAME}}",
+  "github_user": "{{GITHUB_USER}}",
+  "meta_repo": "{{META_REPO_URL}}",
+  "notion": {
+    "enabled": {{NOTION_ENABLED}}
+  },
+  "sub_projects": []
+}

@@ -1,0 +1,8 @@
+name: Sync to Sub-Repos
+on:
+  push:
+    branches: [main]
+jobs:
+  sync:
+    uses: {{CCM_REPO}}/.github/workflows/sync.yml@main
+    secrets: inherit
