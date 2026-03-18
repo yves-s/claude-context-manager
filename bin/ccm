@@ -81,8 +81,69 @@ cmd_init() {
 }
 
 cmd_add() {
-  # defined in Task 7 — placeholder to satisfy router
-  echo "cmd_add not yet implemented" && exit 1
+  META_PATH=$(get_meta_repo)
+  if [[ -z "$META_PATH" || ! -d "$META_PATH" ]]; then
+    echo "❌ Kein Meta-Repo gefunden."
+    echo "   Führe zuerst 'ccm init' in deinem Meta-Repo aus."
+    exit 1
+  fi
+
+  META_CONFIG="$META_PATH/ccm.json"
+  META_REPO_URL=$(jq -r '.meta_repo' "$META_CONFIG")
+
+  if [[ "${CCM_NON_INTERACTIVE:-}" == "1" ]]; then
+    REPO_NAME="$CCM_REPO_NAME"
+    REPO_URL="$CCM_REPO_URL"
+  else
+    REPO_NAME=$(basename "$(pwd)")
+    GITHUB_USER=$(jq -r '.github_user' "$META_CONFIG")
+    REPO_URL="git@github.com:$GITHUB_USER/$REPO_NAME.git"
+    echo "🔗 Sub-Projekt registrieren"
+    echo "   Meta-Repo: $META_PATH"
+    read -rp "   Repo-URL [$REPO_URL]: " _URL
+    REPO_URL="${_URL:-$REPO_URL}"
+  fi
+
+  MARKER="<!-- PROJECT CONTEXT BELOW -->"
+
+  # Register in meta-repo (idempotent)
+  EXISTING=$(jq -r --arg url "$REPO_URL" \
+    '.sub_projects[] | select(.repo == $url) | .repo' "$META_CONFIG")
+  if [[ -z "$EXISTING" ]]; then
+    jq --arg repo "$REPO_URL" --arg marker "$MARKER" \
+      '.sub_projects += [{"repo": $repo, "marker": $marker}]' \
+      "$META_CONFIG" > "$META_CONFIG.tmp" && mv "$META_CONFIG.tmp" "$META_CONFIG"
+  fi
+
+  # Create or update CLAUDE.md
+  if [[ -f "CLAUDE.md" ]]; then
+    # Preserve project section — only update meta part
+    bash "$LIB_DIR/merge.sh" "$META_PATH/CLAUDE.md" "CLAUDE.md" "$MARKER"
+  else
+    # First run — assemble from templates
+    {
+      cat "$META_PATH/CLAUDE.md"
+      echo ""
+      echo "---"
+      echo ""
+      sed "s|{{REPO_NAME}}|$REPO_NAME|g; s|{{REPO_URL}}|$REPO_URL|g" \
+        "$TEMPLATES_DIR/sub/CLAUDE.md"
+    } > CLAUDE.md
+  fi
+
+  # Create .ccm marker (idempotent overwrite is fine — it's generated content)
+  sed "s|{{META_REPO_URL}}|$META_REPO_URL|g" \
+    "$TEMPLATES_DIR/sub/dot-ccm" > .ccm
+
+  echo ""
+  echo "✅ $REPO_NAME registriert"
+  echo "   CLAUDE.md erstellt/aktualisiert"
+  echo "   .ccm Marker erstellt"
+  echo ""
+  echo "Nächste Schritte:"
+  echo "  1. CLAUDE.md Projekt-Kontext anpassen (unterhalb des Markers)"
+  echo "  2. git add CLAUDE.md .ccm && git commit -m 'chore: add CCM context'"
+  echo "  3. git push → Meta-Repo Action synct künftig automatisch"
 }
 
 case "${1:-}" in
