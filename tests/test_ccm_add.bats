@@ -1,5 +1,5 @@
 # tests/test_ccm_add.bats
-load 'test_helper'
+# setup() and teardown() are fully defined below — test_helper not needed here.
 
 setup() {
   TEMP_DIR=$(mktemp -d)  # explicit — do not rely on test_helper here
