@@ -3,6 +3,9 @@ name: CCM Sync (Reusable)
 on:
   workflow_call:
 
+permissions:
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -18,30 +21,44 @@ jobs:
           repository: yves-s/claude-context-manager
           path: .ccm-tools
 
-      - name: Install jq
-        run: sudo apt-get install -y jq
-
       - name: Sync CLAUDE.md to sub-repos
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
           MERGE_SH=".ccm-tools/lib/merge.sh"
+          WORK_DIR=$(pwd)
           SUB_COUNT=$(jq '.sub_projects | length' ccm.json)
           if [[ "$SUB_COUNT" == "0" ]]; then
             echo "No sub-projects registered."
             exit 0
           fi
           for i in $(seq 0 $((SUB_COUNT - 1))); do
-            REPO=$(jq -r ".sub_projects[$i].repo" ccm.json)
-            MARKER=$(jq -r ".sub_projects[$i].marker" ccm.json)
+            REPO=$(jq -r ".sub_projects[$i].repo" ccm.json) || { echo "  ⚠ Could not read sub_projects[$i] — skipping"; continue; }
+            MARKER=$(jq -r ".sub_projects[$i].marker" ccm.json) || { echo "  ⚠ Could not read marker for $REPO — skipping"; continue; }
             REPO_NAME=$(basename "$REPO" .git)
             echo "→ Syncing $REPO_NAME"
-            git clone --depth 1 \
-              "https://x-access-token:${GH_TOKEN}@${REPO#git@github.com:}" \
-              "/tmp/$REPO_NAME" 2>/dev/null \
-              || { echo "  ⚠ Could not clone $REPO — skipping"; continue; }
-            bash "$MERGE_SH" CLAUDE.md "/tmp/$REPO_NAME/CLAUDE.md" "$MARKER"
+
+            # Normalize repo URL to HTTPS with token
+            if [[ "$REPO" == git@github.com:* ]]; then
+              REPO_PATH="${REPO#git@github.com:}"
+            elif [[ "$REPO" == https://github.com/* ]]; then
+              REPO_PATH="${REPO#https://github.com/}"
+            else
+              echo "  ⚠ Unrecognized repo format: $REPO — skipping"
+              continue
+            fi
+            CLONE_URL="https://x-access-token:${GH_TOKEN}@github.com/${REPO_PATH}"
+
+            if ! git clone --depth 1 "$CLONE_URL" "/tmp/$REPO_NAME" 2>/dev/null; then
+              echo "  ⚠ Could not clone $REPO — skipping"
+              continue
+            fi
+
+            if ! bash "$MERGE_SH" "$WORK_DIR/CLAUDE.md" "/tmp/$REPO_NAME/CLAUDE.md" "$MARKER"; then
+              echo "  ⚠ Merge failed for $REPO_NAME — skipping"
+              continue
+            fi
+
             cd "/tmp/$REPO_NAME"
             if git diff --quiet CLAUDE.md; then
               echo "  ✅ Already up to date"
@@ -50,8 +67,11 @@ jobs:
               git config user.name "CCM Sync Bot"
               git add CLAUDE.md
               git commit -m "chore: sync CLAUDE.md from meta-repo [skip ci]"
-              git push
-              echo "  ✅ Synced"
+              if git push; then
+                echo "  ✅ Synced"
+              else
+                echo "  ⚠ Push failed for $REPO_NAME — skipping"
+              fi
             fi
-            cd -
+            cd "$WORK_DIR"
           done
