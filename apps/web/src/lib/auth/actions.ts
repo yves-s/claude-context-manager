@@ -70,9 +70,14 @@ export async function acceptInvite(
   if (invite.accepted_at) return { orgSlug: null, error: 'Invite already used' }
   if (new Date(invite.expires_at) < new Date()) return { orgSlug: null, error: 'Invite expired' }
 
-  await service
+  const { error: memberError } = await service
     .from('organization_members')
     .insert({ organization_id: invite.organization_id, user_id: userId, role: invite.role })
+
+  // If already a member (duplicate), that's fine — still mark invite accepted
+  if (memberError && !memberError.message.includes('duplicate')) {
+    return { orgSlug: null, error: memberError.message }
+  }
 
   await service
     .from('invitations')
