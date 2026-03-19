@@ -46,8 +46,15 @@ curl -fsSL "$CCM_RAW/bin/ccm" -o "$INSTALL_DIR/ccm"
 chmod +x "$INSTALL_DIR/ccm"
 
 mkdir -p "$HOME/.ccm/lib"
-curl -fsSL "$CCM_RAW/lib/config.sh" -o "$HOME/.ccm/lib/config.sh"
-curl -fsSL "$CCM_RAW/lib/merge.sh" -o "$HOME/.ccm/lib/merge.sh"
+curl -fsSL "$CCM_RAW/lib/config.sh"  -o "$HOME/.ccm/lib/config.sh"
+curl -fsSL "$CCM_RAW/lib/merge.sh"   -o "$HOME/.ccm/lib/merge.sh"
+curl -fsSL "$CCM_RAW/lib/buffer.sh"  -o "$HOME/.ccm/lib/buffer.sh"
+curl -fsSL "$CCM_RAW/lib/flush.sh"   -o "$HOME/.ccm/lib/flush.sh"
+
+mkdir -p "$HOME/.ccm/hooks"
+curl -fsSL "$CCM_RAW/hooks/post-tool-use.sh" -o "$HOME/.ccm/hooks/post-tool-use.sh"
+curl -fsSL "$CCM_RAW/hooks/stop.sh"          -o "$HOME/.ccm/hooks/stop.sh"
+chmod +x "$HOME/.ccm/hooks/post-tool-use.sh" "$HOME/.ccm/hooks/stop.sh"
 
 mkdir -p "$HOME/.ccm/templates/meta/context" "$HOME/.ccm/templates/sub"
 for f in CLAUDE.md ccm.json github-workflow.yml; do
@@ -114,6 +121,9 @@ if [[ -n "${CCM_META:-}" ]]; then
   echo "✅ Meta-Repo verknüpft: $META_CLONE_DIR"
 fi
 
+# Install Claude Code hooks
+"$INSTALL_DIR/ccm" hooks install
+
 echo ""
 echo "✅ ccm installiert nach $INSTALL_DIR/ccm"
 echo ""
@@ -122,6 +132,6 @@ if [[ -n "${CCM_META:-}" ]]; then
   echo "  ccm add"
 else
   echo "Erste Schritte:"
-  echo "  mkdir my-meta && cd my-meta && git init"
+  echo "  mkdir my-meta && cd my-meta"
   echo "  ccm init"
 fi

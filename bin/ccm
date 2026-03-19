@@ -44,17 +44,30 @@ cmd_init() {
   REPO_NAME=$(basename "$(pwd)")
   META_REPO_URL="git@github.com:$GITHUB_USER/$REPO_NAME.git"
 
+  # git init if not already a repo
+  if [[ ! -d ".git" ]]; then
+    git init
+  fi
+
   # context/ — only copy if not already present (idempotency)
   if [[ ! -d "context" ]]; then
     cp -r "$TEMPLATES_DIR/meta/context" .
   fi
 
-  # CLAUDE.md — always regenerate from template (contains meta config)
-  sed \
+  # CLAUDE.md — generate from template, or merge if already exists
+  NEW_META=$(sed \
     -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
     -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
     -e "s|{{META_REPO_URL}}|$META_REPO_URL|g" \
-    "$TEMPLATES_DIR/meta/CLAUDE.md" > CLAUDE.md
+    "$TEMPLATES_DIR/meta/CLAUDE.md")
+  if [[ -f "CLAUDE.md" ]]; then
+    MARKER="<!-- PROJECT CONTEXT BELOW -->"
+    echo "$NEW_META" > /tmp/ccm_meta_new.md
+    bash "$LIB_DIR/merge.sh" /tmp/ccm_meta_new.md "CLAUDE.md" "$MARKER"
+    rm -f /tmp/ccm_meta_new.md
+  else
+    echo "$NEW_META" > CLAUDE.md
+  fi
 
   # ccm.json — only create if not already present
   if [[ ! -f "ccm.json" ]]; then
