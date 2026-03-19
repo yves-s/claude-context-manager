@@ -156,6 +156,34 @@ cmd_add() {
   echo "  3. git push → Meta-Repo Action synct künftig automatisch"
 }
 
+cmd_invite() {
+  if [[ ! -f "ccm.json" ]]; then
+    echo "❌ Kein Meta-Repo gefunden."
+    echo "   Führe 'ccm init' in deinem Meta-Repo aus."
+    exit 1
+  fi
+
+  GITHUB_USER=$(jq -r '.github_user' ccm.json)
+  META_REPO_SSH=$(jq -r '.meta_repo' ccm.json)
+
+  # Convert SSH URL to HTTPS (non-tech users have no SSH keys)
+  # git@github.com:org/repo.git → https://github.com/org/repo.git
+  META_REPO_HTTPS=$(echo "$META_REPO_SSH" \
+    | sed 's|git@github.com:|https://github.com/|')
+
+  INSTALL_URL="https://raw.githubusercontent.com/${CCM_REPO}/main/install.sh"
+
+  echo ""
+  echo "👋 Teile diesen Befehl mit deinem Team:"
+  echo ""
+  echo "  curl -fsSL $INSTALL_URL \\"
+  echo "    | CCM_META=$META_REPO_HTTPS bash"
+  echo ""
+  echo "Jedes Teammitglied führt danach im eigenen Projektordner aus:"
+  echo "  ccm add"
+  echo ""
+}
+
 cmd_hooks() {
   local subcmd="${1:-}"
   case "$subcmd" in
@@ -222,6 +250,7 @@ _hooks_install() {
 case "${1:-}" in
   init)    cmd_init ;;
   add)     cmd_add ;;
+  invite)  cmd_invite ;;
   flush)   cmd_flush ;;
   hooks)   cmd_hooks "${2:-}" ;;
   version) echo "ccm $CCM_VERSION" ;;
@@ -231,6 +260,7 @@ case "${1:-}" in
     echo "Commands:"
     echo "  init     Meta-Repo im aktuellen Verzeichnis einrichten"
     echo "  add      Dieses Projekt als Sub-Repo registrieren"
+    echo "  invite   Team-Einladungsbefehl generieren"
     echo "  flush    Buffer klassifizieren und in Memory/Meta-Repo schreiben"
     echo "  hooks    Hook-Management (install)"
     echo "  version  Version anzeigen"
