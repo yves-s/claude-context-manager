@@ -82,7 +82,7 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
 fi
 
 # Also persist ~/.ccm/bin to PATH if jq was downloaded there
-if [[ -d "$HOME/.ccm/bin" ]] && [[ ":$PATH:" != *":$HOME/.ccm/bin:"* ]]; then
+if [[ -f "$HOME/.ccm/bin/jq" ]] && [[ ":$PATH:" != *":$HOME/.ccm/bin:"* ]]; then
   CCM_BIN_LINE="export PATH=\"\$HOME/.ccm/bin:\$PATH\""
   if ! grep -qF "$CCM_BIN_LINE" "$RC_FILE" 2>/dev/null; then
     echo "" >> "$RC_FILE"
@@ -91,6 +91,7 @@ if [[ -d "$HOME/.ccm/bin" ]] && [[ ":$PATH:" != *":$HOME/.ccm/bin:"* ]]; then
     echo "→ PATH aktualisiert in $RC_FILE (ccm/bin)"
   fi
 fi
+
 # If CCM_META is set: clone meta-repo and register it
 if [[ -n "${CCM_META:-}" ]]; then
   META_CLONE_DIR="$HOME/.ccm/meta"
@@ -104,7 +105,6 @@ if [[ -n "${CCM_META:-}" ]]; then
     fi
   fi
   # Register meta-repo path in ~/.ccm/config (inline, no ccm call needed)
-  mkdir -p "$HOME/.ccm"
   if [[ -f "$HOME/.ccm/config" ]]; then
     jq --arg p "$META_CLONE_DIR" '.default_meta = $p' "$HOME/.ccm/config" \
       > "$HOME/.ccm/config.tmp" && mv "$HOME/.ccm/config.tmp" "$HOME/.ccm/config"

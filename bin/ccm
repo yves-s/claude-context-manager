@@ -170,6 +170,11 @@ cmd_invite() {
   fi
 
   META_REPO_SSH=$(jq -r '.meta_repo' ccm.json)
+  if [[ -z "$META_REPO_SSH" || "$META_REPO_SSH" == "null" ]]; then
+    echo "❌ meta_repo nicht konfiguriert in ccm.json."
+    echo "   Führe 'ccm init' erneut aus."
+    exit 1
+  fi
 
   # Convert SSH URL to HTTPS (non-tech users have no SSH keys)
   # git@github.com:org/repo.git → https://github.com/org/repo.git
