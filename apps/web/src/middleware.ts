@@ -55,7 +55,10 @@ export async function middleware(request: NextRequest) {
     const jwt = session.data.session?.access_token
     if (jwt) {
       // Decode JWT claims (no verification needed — Supabase already verified)
-      const payload = JSON.parse(atob(jwt.split('.')[1]))
+      // Normalize base64url → base64 before atob
+      const b64 = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+      const padded = b64 + '='.repeat((4 - b64.length % 4) % 4)
+      const payload = JSON.parse(atob(padded))
       const orgRoles = payload.org_roles ?? {}
       if (!orgRoles[org.id]) {
         return NextResponse.redirect(new URL('/select-org', request.url))
@@ -64,7 +67,12 @@ export async function middleware(request: NextRequest) {
       const requestHeaders = new Headers(request.headers)
       requestHeaders.set('x-org-id', org.id)
       requestHeaders.set('x-org-role', orgRoles[org.id])
-      return NextResponse.next({ request: { headers: requestHeaders } })
+      const orgResponse = NextResponse.next({ request: { headers: requestHeaders } })
+      // Copy Supabase session cookies so token refresh is not discarded
+      supabaseResponse.cookies.getAll().forEach(cookie => {
+        orgResponse.cookies.set(cookie.name, cookie.value, cookie as Parameters<typeof orgResponse.cookies.set>[2])
+      })
+      return orgResponse
     }
   }
 

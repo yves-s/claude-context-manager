@@ -84,7 +84,8 @@ export async function acceptInvite(
     .update({ accepted_at: new Date().toISOString() })
     .eq('id', token)
 
-  const org = invite.organizations as { slug: string } | null
+  const orgData = invite.organizations
+  const org = (Array.isArray(orgData) ? orgData[0] : orgData) as { slug: string } | null
   return { orgSlug: org?.slug ?? null, error: null }
 }
 
