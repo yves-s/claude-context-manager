@@ -72,7 +72,7 @@ case "$SHELL_NAME" in
 esac
 
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-  EXPORT_LINE="export PATH=\"\$HOME/.local/bin:\$PATH\""
+  EXPORT_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
   if ! grep -qF "$EXPORT_LINE" "$RC_FILE" 2>/dev/null; then
     echo "" >> "$RC_FILE"
     echo "# ccm" >> "$RC_FILE"
@@ -88,6 +88,8 @@ fi
 if [[ -d "$HOME/.ccm/bin" ]] && [[ ":$PATH:" != *":$HOME/.ccm/bin:"* ]]; then
   CCM_BIN_LINE="export PATH=\"\$HOME/.ccm/bin:\$PATH\""
   if ! grep -qF "$CCM_BIN_LINE" "$RC_FILE" 2>/dev/null; then
+    echo "" >> "$RC_FILE"
+    echo "# ccm" >> "$RC_FILE"
     echo "$CCM_BIN_LINE" >> "$RC_FILE"
   fi
 fi
