@@ -224,10 +224,12 @@ _hooks_install() {
   local hook_dir="${CCM_HOME:-$HOME/.ccm}/hooks"
   local settings_file="${CLAUDE_SETTINGS_FILE:-$HOME/.claude/settings.json}"
 
-  # Copy hook scripts from HOOKS_DIR (repo or ~/.ccm/hooks in installed mode)
+  # Copy hook scripts from HOOKS_DIR (skip if already in place — installed mode)
   mkdir -p "$hook_dir"
-  cp "$HOOKS_DIR/post-tool-use.sh" "$hook_dir/post-tool-use.sh"
-  cp "$HOOKS_DIR/stop.sh"          "$hook_dir/stop.sh"
+  if [[ "$HOOKS_DIR/post-tool-use.sh" != "$hook_dir/post-tool-use.sh" ]]; then
+    cp "$HOOKS_DIR/post-tool-use.sh" "$hook_dir/post-tool-use.sh"
+    cp "$HOOKS_DIR/stop.sh"          "$hook_dir/stop.sh"
+  fi
   chmod +x "$hook_dir/post-tool-use.sh" "$hook_dir/stop.sh"
 
   local post_hook="$hook_dir/post-tool-use.sh"
