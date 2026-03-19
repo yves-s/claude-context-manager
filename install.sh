@@ -7,12 +7,39 @@ INSTALL_DIR="${CCM_INSTALL_DIR:-$HOME/.local/bin}"
 
 echo "Installing ccm..."
 
-for dep in git jq; do
-  if ! command -v "$dep" &>/dev/null; then
-    echo "❌ Required: $dep — install with: brew install $dep"
-    exit 1
+# git is still required (no auto-install)
+if ! command -v git &>/dev/null; then
+  echo "❌ git ist erforderlich. Installiere es von https://git-scm.com"
+  exit 1
+fi
+
+# jq: auto-install if missing
+if ! command -v jq &>/dev/null; then
+  if command -v brew &>/dev/null; then
+    echo "→ Installiere jq via brew..."
+    brew install jq
+  else
+    echo "→ Lade jq herunter..."
+    JQ_DIR="$HOME/.ccm/bin"
+    mkdir -p "$JQ_DIR"
+    ARCH=$(uname -m)
+    if [[ "$ARCH" == "arm64" ]]; then
+      JQ_BINARY="jq-macos-arm64"
+    else
+      JQ_BINARY="jq-macos-amd64"
+    fi
+    JQ_URL="https://github.com/jqlang/jq/releases/download/jq-1.7.1/${JQ_BINARY}"
+    if ! curl -fsSL "$JQ_URL" -o "$JQ_DIR/jq"; then
+      echo "❌ jq konnte nicht heruntergeladen werden."
+      echo "   Installiere es manuell: brew install jq"
+      exit 1
+    fi
+    chmod +x "$JQ_DIR/jq"
+    # Add to PATH for this script session only
+    export PATH="$JQ_DIR:$PATH"
+    echo "✅ jq installiert ($JQ_DIR/jq)"
   fi
-done
+fi
 
 mkdir -p "$INSTALL_DIR"
 curl -fsSL "$CCM_RAW/bin/ccm" -o "$INSTALL_DIR/ccm"
