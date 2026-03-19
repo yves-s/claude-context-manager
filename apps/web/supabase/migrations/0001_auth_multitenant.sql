@@ -46,14 +46,21 @@ CREATE POLICY "users see their orgs"
     )
   );
 
--- RLS: organization_members — user sees members of their orgs
+-- Helper function (SECURITY DEFINER bypasses RLS — breaks the recursion)
+CREATE OR REPLACE FUNCTION public.get_my_org_ids()
+RETURNS TABLE(organization_id uuid)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT organization_id FROM organization_members WHERE user_id = auth.uid();
+$$;
+
+-- RLS: organization_members — user sees members of their orgs (uses SECURITY DEFINER helper)
 CREATE POLICY "users see members of their orgs"
   ON organization_members FOR SELECT
   USING (
-    organization_id IN (
-      SELECT organization_id FROM organization_members
-      WHERE user_id = auth.uid()
-    )
+    organization_id IN (SELECT organization_id FROM public.get_my_org_ids())
   );
 
 -- RLS: invitations — admins/owners see invites for their orgs
