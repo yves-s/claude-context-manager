@@ -94,7 +94,37 @@ if [[ -d "$HOME/.ccm/bin" ]] && [[ ":$PATH:" != *":$HOME/.ccm/bin:"* ]]; then
     echo "→ PATH aktualisiert in $RC_FILE (ccm/bin)"
   fi
 fi
+# If CCM_META is set: clone meta-repo and register it
+if [[ -n "${CCM_META:-}" ]]; then
+  META_CLONE_DIR="$HOME/.ccm/meta"
+  if [[ -d "$META_CLONE_DIR/.git" ]]; then
+    echo "→ Meta-Repo bereits vorhanden, überspringe Clone"
+  else
+    echo "→ Clone Meta-Repo nach $META_CLONE_DIR ..."
+    if ! git clone "$CCM_META" "$META_CLONE_DIR"; then
+      echo "❌ Clone fehlgeschlagen. Prüfe die URL: $CCM_META"
+      exit 1
+    fi
+  fi
+  # Register meta-repo path in ~/.ccm/config (inline, no ccm call needed)
+  mkdir -p "$HOME/.ccm"
+  if [[ -f "$HOME/.ccm/config" ]]; then
+    jq --arg p "$META_CLONE_DIR" '.default_meta = $p' "$HOME/.ccm/config" \
+      > "$HOME/.ccm/config.tmp" && mv "$HOME/.ccm/config.tmp" "$HOME/.ccm/config"
+  else
+    jq -n --arg p "$META_CLONE_DIR" '{default_meta: $p}' > "$HOME/.ccm/config"
+  fi
+  echo "✅ Meta-Repo verknüpft: $META_CLONE_DIR"
+fi
+
 echo ""
-echo "Get started:"
-echo "  mkdir my-project-meta && cd my-project-meta && git init"
-echo "  ccm init"
+echo "✅ ccm installiert nach $INSTALL_DIR/ccm"
+echo ""
+if [[ -n "${CCM_META:-}" ]]; then
+  echo "Bereit! Führe in deinem Projekt aus:"
+  echo "  ccm add"
+else
+  echo "Erste Schritte:"
+  echo "  mkdir my-meta && cd my-meta && git init"
+  echo "  ccm init"
+fi
