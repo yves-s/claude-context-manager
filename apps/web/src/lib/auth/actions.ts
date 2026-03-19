@@ -3,17 +3,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { generateSlug } from '@/lib/auth/slug'
 
 // --- Helpers ---
-
-export function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-}
 
 async function getUniqueSlug(base: string, supabase: Awaited<ReturnType<typeof createClient>>): Promise<string> {
   let slug = base

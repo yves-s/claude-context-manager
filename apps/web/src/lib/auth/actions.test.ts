@@ -17,7 +17,8 @@ vi.mock('next/navigation', () => ({
 
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { generateSlug, createOrganization, acceptInvite, createInvite, revokeInvite } from './actions'
+import { generateSlug } from './slug'
+import { createOrganization, acceptInvite, createInvite, revokeInvite } from './actions'
 
 describe('generateSlug', () => {
   it('lowercases and replaces spaces with hyphens', () => {
