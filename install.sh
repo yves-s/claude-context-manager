@@ -72,7 +72,7 @@ case "$SHELL_NAME" in
 esac
 
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-  EXPORT_LINE="export PATH=\"$INSTALL_DIR:\$PATH\""
+  EXPORT_LINE='export PATH="$HOME/.local/bin:$PATH"'
   if ! grep -qF "$EXPORT_LINE" "$RC_FILE" 2>/dev/null; then
     echo "" >> "$RC_FILE"
     echo "# ccm" >> "$RC_FILE"
@@ -91,8 +91,10 @@ if [[ -d "$HOME/.ccm/bin" ]] && [[ ":$PATH:" != *":$HOME/.ccm/bin:"* ]]; then
     echo "" >> "$RC_FILE"
     echo "# ccm" >> "$RC_FILE"
     echo "$CCM_BIN_LINE" >> "$RC_FILE"
+    echo "→ PATH aktualisiert in $RC_FILE (ccm/bin)"
   fi
 fi
+echo ""
 echo "Get started:"
 echo "  mkdir my-project-meta && cd my-project-meta && git init"
 echo "  ccm init"
