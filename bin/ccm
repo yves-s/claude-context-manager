@@ -163,7 +163,6 @@ cmd_invite() {
     exit 1
   fi
 
-  GITHUB_USER=$(jq -r '.github_user' ccm.json)
   META_REPO_SSH=$(jq -r '.meta_repo' ccm.json)
 
   # Convert SSH URL to HTTPS (non-tech users have no SSH keys)
