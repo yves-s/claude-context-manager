@@ -2,25 +2,31 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-export function LoginForm() {
+interface Props {
+  redirectTo?: string
+}
+
+export function LoginForm({ redirectTo }: Props) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false) }
-    // On success, middleware + server redirect handles navigation
+    if (error) { setError(error.message); setLoading(false); return }
+    router.push(redirectTo ?? '/select-org')
   }
 
   async function handleSSO(provider: 'google' | 'azure') {

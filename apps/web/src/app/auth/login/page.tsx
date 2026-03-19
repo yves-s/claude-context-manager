@@ -4,7 +4,12 @@ import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
-export default function LoginPage() {
+interface Props {
+  searchParams: Promise<{ redirectTo?: string }>
+}
+
+export default async function LoginPage({ searchParams }: Props) {
+  const { redirectTo } = await searchParams
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-4">
       <div className="flex flex-col items-center gap-1">
@@ -14,7 +19,7 @@ export default function LoginPage() {
           <Link href="/auth/signup" className="underline">Sign up</Link>
         </p>
       </div>
-      <LoginForm />
+      <LoginForm redirectTo={redirectTo} />
     </main>
   )
 }

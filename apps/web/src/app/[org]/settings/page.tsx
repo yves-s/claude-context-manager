@@ -39,19 +39,18 @@ export default async function SettingsPage({ params }: Props) {
   // Resolve user emails via service client (auth.users is not accessible via PostgREST)
   const service = createServiceClient()
   const userIds = (membersRaw ?? []).map(m => m.user_id as string)
-  const emailMap: Record<string, string> = {}
-  if (userIds.length > 0) {
-    const { data: usersData } = await service.auth.admin.listUsers()
-    for (const u of usersData?.users ?? []) {
-      if (userIds.includes(u.id)) {
-        emailMap[u.id] = u.email ?? '—'
-      }
-    }
-  }
+  const userResults = await Promise.all(
+    userIds.map(id => service.auth.admin.getUserById(id))
+  )
+  const userMap = new Map(
+    userResults
+      .filter(r => r.data.user != null)
+      .map(r => [r.data.user!.id, r.data.user!.email ?? '—'])
+  )
 
   const members = (membersRaw ?? []).map(m => ({
     id: m.id as string,
-    email: emailMap[m.user_id as string] ?? '—',
+    email: userMap.get(m.user_id as string) ?? '—',
     role: m.role as string,
     joined_at: m.joined_at as string,
   }))

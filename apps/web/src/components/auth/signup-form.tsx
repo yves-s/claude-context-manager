@@ -9,10 +9,12 @@ import { Label } from '@/components/ui/label'
 
 interface Props {
   invite?: string  // invite token from ?invite= URL param
+  email?: string
 }
 
-export function SignupForm({ invite }: Props) {
-  const [email, setEmail] = useState('')
+export function SignupForm(props: Props) {
+  const { invite } = props
+  const [email, setEmail] = useState(props.email ?? '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)

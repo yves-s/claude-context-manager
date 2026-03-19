@@ -51,7 +51,7 @@ CREATE OR REPLACE FUNCTION public.get_my_org_ids()
 RETURNS TABLE(organization_id uuid)
 LANGUAGE sql
 SECURITY DEFINER
-STABLE
+VOLATILE
 AS $$
   SELECT organization_id FROM organization_members WHERE user_id = auth.uid();
 $$;
@@ -79,7 +79,7 @@ CREATE POLICY "admins see org invitations"
 CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 AS $$
 DECLARE
   claims jsonb;
@@ -104,3 +104,47 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.custom_access_token_hook TO supabase_auth_admin;
 REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, anon, public;
+
+-- organizations: any authenticated user can create an org
+CREATE POLICY "authenticated users can create orgs"
+  ON organizations FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- organization_members: users can only insert themselves
+CREATE POLICY "users can join orgs"
+  ON organization_members FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- invitations: admins/owners can create invites for their orgs
+CREATE POLICY "admins can create invitations"
+  ON invitations FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    organization_id IN (
+      SELECT organization_id FROM public.get_my_org_ids()
+    )
+    AND EXISTS (
+      SELECT 1 FROM organization_members
+      WHERE organization_id = invitations.organization_id
+        AND user_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    )
+  );
+
+-- invitations: admins/owners can revoke (delete) invites for their orgs
+CREATE POLICY "admins can revoke invitations"
+  ON invitations FOR DELETE
+  TO authenticated
+  USING (
+    organization_id IN (
+      SELECT organization_id FROM public.get_my_org_ids()
+    )
+    AND EXISTS (
+      SELECT 1 FROM organization_members
+      WHERE organization_id = invitations.organization_id
+        AND user_id = auth.uid()
+        AND role IN ('owner', 'admin')
+    )
+  );

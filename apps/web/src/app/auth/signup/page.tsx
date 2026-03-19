@@ -5,11 +5,11 @@ import Link from 'next/link'
 export const dynamic = 'force-dynamic'
 
 interface Props {
-  searchParams: Promise<{ invite?: string }>
+  searchParams: Promise<{ invite?: string; email?: string }>
 }
 
 export default async function SignupPage({ searchParams }: Props) {
-  const { invite } = await searchParams
+  const { invite, email } = await searchParams
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-4">
       <div className="flex flex-col items-center gap-1">
@@ -19,7 +19,7 @@ export default async function SignupPage({ searchParams }: Props) {
           <Link href="/auth/login" className="underline">Sign in</Link>
         </p>
       </div>
-      <SignupForm invite={invite} />
+      <SignupForm invite={invite} email={email} />
     </main>
   )
 }

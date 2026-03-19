@@ -118,6 +118,24 @@ export async function revokeInvite(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // Check caller is admin/owner of the org that owns this invite
+  const { data: invite, error: inviteError } = await supabase
+    .from('invitations')
+    .select('organization_id')
+    .eq('id', inviteId)
+    .single()
+  if (inviteError || !invite) return { error: 'Invite not found' }
+
+  const { data: membership, error: memberError } = await supabase
+    .from('organization_members')
+    .select('role')
+    .eq('organization_id', invite.organization_id)
+    .eq('user_id', user.id)
+    .single()
+  if (memberError || !membership || !['owner', 'admin'].includes(membership.role)) {
+    return { error: 'Not authorized' }
+  }
+
   const { error } = await supabase
     .from('invitations')
     .delete()
