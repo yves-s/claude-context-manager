@@ -29,7 +29,6 @@ cmd_init() {
   if [[ "${CCM_NON_INTERACTIVE:-}" == "1" ]]; then
     GITHUB_USER="$CCM_GITHUB_USER"
     PROJECT_NAME="$CCM_PROJECT_NAME"
-    NOTION_ENABLED="${CCM_NOTION:-false}"
   else
     echo "🚀 CCM — Meta-Repo Setup"
     echo "========================"
@@ -37,8 +36,6 @@ cmd_init() {
     [[ -z "$GITHUB_USER" ]] && { echo "❌ Erforderlich."; exit 1; }
     read -rp "Projektname: " PROJECT_NAME
     PROJECT_NAME="${PROJECT_NAME:-Mein Projekt}"
-    read -rp "Notion-Integration aktivieren? (y/n): " _NOTION
-    [[ "$_NOTION" == "y" ]] && NOTION_ENABLED=true || NOTION_ENABLED=false
   fi
 
   REPO_NAME=$(basename "$(pwd)")
@@ -75,7 +72,6 @@ cmd_init() {
       -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
       -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
       -e "s|{{META_REPO_URL}}|$META_REPO_URL|g" \
-      -e "s|{{NOTION_ENABLED}}|$NOTION_ENABLED|g" \
       "$TEMPLATES_DIR/meta/ccm.json" > ccm.json
   fi
 

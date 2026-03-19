@@ -29,14 +29,6 @@ Siehe `context/credentials.md` für API-Key-Verweise.
 
 ---
 
-## Notion — Dynamische Arbeitsumgebung
-
-Notion ist die **Source of Truth für alles Dynamische**.
-
-**Regel:** Lies Notion für aktuellen Projektstatus. Speichere hier nie Notion-Inhalte als Kopie — immer live abrufen.
-
----
-
 ## Auto-Sync Regeln
 
 ### Claude aktualisiert das Meta-Repo eigenständig wenn:
