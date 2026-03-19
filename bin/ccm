@@ -157,8 +157,66 @@ cmd_add() {
 }
 
 cmd_hooks() {
-  echo "ccm hooks: not yet implemented" >&2
-  exit 1
+  local subcmd="${1:-}"
+  case "$subcmd" in
+    install) _hooks_install ;;
+    *)
+      echo "Usage: ccm hooks <subcommand>"
+      echo ""
+      echo "Subcommands:"
+      echo "  install  Hooks in Claude Code Settings registrieren"
+      ;;
+  esac
+}
+
+_hooks_install() {
+  local hook_dir="${CCM_HOME:-$HOME/.ccm}/hooks"
+  local settings_file="${CLAUDE_SETTINGS_FILE:-$HOME/.claude/settings.json}"
+
+  # Copy hook scripts from HOOKS_DIR (repo or ~/.ccm/hooks in installed mode)
+  mkdir -p "$hook_dir"
+  cp "$HOOKS_DIR/post-tool-use.sh" "$hook_dir/post-tool-use.sh"
+  cp "$HOOKS_DIR/stop.sh"          "$hook_dir/stop.sh"
+  chmod +x "$hook_dir/post-tool-use.sh" "$hook_dir/stop.sh"
+
+  local post_hook="$hook_dir/post-tool-use.sh"
+  local stop_hook="$hook_dir/stop.sh"
+
+  # Merge hooks into settings.json (idempotent: remove existing CCM entries first)
+  mkdir -p "$(dirname "$settings_file")"
+
+  if [[ -f "$settings_file" ]]; then
+    jq \
+      --arg post "$post_hook" \
+      --arg stop "$stop_hook" \
+      '
+      .hooks.PostToolUse = (
+        (.hooks.PostToolUse // []) |
+        map(select(.hooks[0].command != $post)) +
+        [{"matcher": "Edit|Write|NotebookEdit", "hooks": [{"type": "command", "command": $post}]}]
+      ) |
+      .hooks.Stop = (
+        (.hooks.Stop // []) |
+        map(select(.hooks[0].command != $stop)) +
+        [{"hooks": [{"type": "command", "command": $stop}]}]
+      )
+      ' "$settings_file" > "$settings_file.tmp" && mv "$settings_file.tmp" "$settings_file"
+  else
+    jq -n \
+      --arg post "$post_hook" \
+      --arg stop "$stop_hook" \
+      '{hooks: {
+        PostToolUse: [{"matcher": "Edit|Write|NotebookEdit", "hooks": [{"type": "command", "command": $post}]}],
+        Stop: [{"hooks": [{"type": "command", "command": $stop}]}]
+      }}' > "$settings_file"
+  fi
+
+  echo ""
+  echo "✅ CCM Hooks installiert"
+  echo "   Hooks:    $hook_dir"
+  echo "   Settings: $settings_file"
+  echo ""
+  echo "Starte Claude Code neu um die Hooks zu aktivieren."
 }
 
 case "${1:-}" in
