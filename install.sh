@@ -60,9 +60,6 @@ for f in CLAUDE.md dot-ccm; do
   curl -fsSL "$CCM_RAW/templates/sub/$f" -o "$HOME/.ccm/templates/sub/$f"
 done
 
-echo "✅ ccm installed to $INSTALL_DIR/ccm"
-echo ""
-
 # Detect shell config file (used by both PATH blocks below)
 SHELL_NAME=$(basename "$SHELL")
 case "$SHELL_NAME" in
