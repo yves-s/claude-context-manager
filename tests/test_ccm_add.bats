@@ -128,3 +128,21 @@ _run_add() {
   count=$(echo "$output" | grep -c "chore: add CCM context" || true)
   [ "$count" -eq 1 ]
 }
+
+@test "ccm add: does not commit pre-existing staged changes" {
+  _setup_meta
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  # Stage a file before running ccm add
+  echo "my work" > myfile.txt
+  git add myfile.txt
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+  # myfile.txt must NOT be in the CCM commit
+  run git show --name-only HEAD
+  [[ "$output" != *"myfile.txt"* ]]
+  # myfile.txt must still be staged
+  run git diff --cached --name-only
+  [[ "$output" == *"myfile.txt"* ]]
+}
