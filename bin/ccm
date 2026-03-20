@@ -59,9 +59,14 @@ cmd_init() {
     "$TEMPLATES_DIR/meta/CLAUDE.md")
   if [[ -f "CLAUDE.md" ]]; then
     MARKER="<!-- PROJECT CONTEXT BELOW -->"
-    echo "$NEW_META" > /tmp/ccm_meta_new.md
-    bash "$LIB_DIR/merge.sh" /tmp/ccm_meta_new.md "CLAUDE.md" "$MARKER"
-    rm -f /tmp/ccm_meta_new.md
+    if grep -q "$MARKER" "CLAUDE.md"; then
+      echo "$NEW_META" > /tmp/ccm_meta_new.md
+      bash "$LIB_DIR/merge.sh" /tmp/ccm_meta_new.md "CLAUDE.md" "$MARKER"
+      rm -f /tmp/ccm_meta_new.md
+    else
+      # Meta-repo CLAUDE.md without project marker — safe to overwrite
+      echo "$NEW_META" > CLAUDE.md
+    fi
   else
     echo "$NEW_META" > CLAUDE.md
   fi
@@ -83,16 +88,42 @@ cmd_init() {
   # Register in global config
   set_meta_repo "$(pwd)"
 
+  # Auto-commit generated files
+  REMOTE_URL=""
+  git add CLAUDE.md ccm.json context/ .github/
+  if git diff --cached --quiet; then
+    CCM_COMMIT_STATUS="— keine Änderungen"
+    CCM_PUSH_STATUS="— übersprungen"
+    CCM_DID_COMMIT=0
+  else
+    git commit -m 'chore: init CCM meta-repo'
+    CCM_COMMIT_STATUS="chore: init CCM meta-repo"
+    CCM_DID_COMMIT=1
+
+    REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
+    if [[ -z "$REMOTE_URL" ]]; then
+      CCM_PUSH_STATUS="— kein Remote konfiguriert"
+    elif [[ "${CCM_SKIP_PUSH:-}" == "1" ]]; then
+      CCM_PUSH_STATUS="— übersprungen (test)"
+    else
+      PUSH_OUTPUT=$(git push -u origin main 2>&1) || {
+        echo ""
+        echo "❌ Push fehlgeschlagen:"
+        echo "$PUSH_OUTPUT"
+        exit 1
+      }
+      CCM_PUSH_STATUS="→ origin/main"
+    fi
+  fi
+
   echo ""
-  echo "✅ Meta-Repo konfiguriert"
+  echo "✅ Meta-Repo eingerichtet"
   echo "   Projekt:  $PROJECT_NAME"
-  echo "   GitHub:   $GITHUB_USER"
+  [[ -n "${REMOTE_URL:-}" ]] && echo "   Remote:   $REMOTE_URL"
+  echo "   Commit:   $CCM_COMMIT_STATUS"
+  echo "   Push:     $CCM_PUSH_STATUS"
   echo ""
-  echo "Nächste Schritte:"
-  echo "  1. context/ Dateien anpassen"
-  echo "  2. git remote add origin $META_REPO_URL"
-  echo "  3. git push -u origin main"
-  echo "  4. Sub-Projekt hinzufügen: ccm add (im Sub-Repo)"
+  echo "Nächstes:  ccm add  (im Sub-Projekt ausführen)"
 }
 
 cmd_flush() {
