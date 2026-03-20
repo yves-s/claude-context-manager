@@ -1,3 +1,4 @@
 .worktrees
 .DS_Store
 .superpowers/
+.pipeline/node_modules

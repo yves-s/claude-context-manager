@@ -32,9 +32,10 @@ cmd_init() {
   else
     echo "🚀 CCM — Meta-Repo Setup"
     echo "========================"
-    read -rp "GitHub Username oder Organisation: " GITHUB_USER
+    echo ""
+    read -rp "GitHub Username oder Organisation (z.B. 'acme-corp', findest du in der URL: github.com/<hier>): " GITHUB_USER
     [[ -z "$GITHUB_USER" ]] && { echo "❌ Erforderlich."; exit 1; }
-    read -rp "Projektname: " PROJECT_NAME
+    read -rp "Projektname (lesbarer Name, z.B. 'Acme Dashboard'): " PROJECT_NAME
     PROJECT_NAME="${PROJECT_NAME:-Mein Projekt}"
   fi
 
