@@ -160,15 +160,36 @@ cmd_add() {
   sed "s|{{META_REPO_URL}}|$META_REPO_URL|g" \
     "$TEMPLATES_DIR/sub/dot-ccm" > .ccm
 
+  # Auto-commit CCM files only (do not touch pre-existing staged changes)
+  git add CLAUDE.md .ccm
+  if git diff --cached --quiet; then
+    CCM_COMMIT_STATUS="— keine Änderungen"
+    CCM_PUSH_STATUS="— übersprungen"
+  else
+    git commit -m 'chore: add CCM context'
+    CCM_COMMIT_STATUS="chore: add CCM context"
+
+    if ! git remote get-url origin &>/dev/null 2>&1; then
+      CCM_PUSH_STATUS="— kein Remote konfiguriert"
+    elif [[ "${CCM_SKIP_PUSH:-}" == "1" ]]; then
+      CCM_PUSH_STATUS="— übersprungen (test)"
+    else
+      CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
+      PUSH_OUTPUT=$(git push 2>&1) || {
+        echo ""
+        echo "❌ Push fehlgeschlagen:"
+        echo "$PUSH_OUTPUT"
+        exit 1
+      }
+      CCM_PUSH_STATUS="→ $CURRENT_BRANCH"
+    fi
+  fi
+
   echo ""
-  echo "✅ $REPO_NAME registriert"
-  echo "   CLAUDE.md erstellt/aktualisiert"
-  echo "   .ccm Marker erstellt"
-  echo ""
-  echo "Nächste Schritte:"
-  echo "  1. CLAUDE.md Projekt-Kontext anpassen (unterhalb des Markers)"
-  echo "  2. git add CLAUDE.md .ccm && git commit -m 'chore: add CCM context'"
-  echo "  3. git push → Meta-Repo Action synct künftig automatisch"
+  echo "✅ $REPO_NAME eingebunden"
+  echo "   Meta-Repo:  $META_PATH"
+  echo "   Commit:     $CCM_COMMIT_STATUS"
+  echo "   Push:       $CCM_PUSH_STATUS"
 }
 
 cmd_invite() {
