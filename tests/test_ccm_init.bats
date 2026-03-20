@@ -4,6 +4,7 @@ load 'test_helper'
 _run_init() {
   CCM_GITHUB_USER="testuser" CCM_PROJECT_NAME="${1:-testproject}" \
   CCM_NOTION="false" CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+  CCM_SKIP_PUSH=1 \
     bash "$BATS_TEST_DIRNAME/../bin/ccm" init
 }
 
@@ -51,4 +52,59 @@ _run_init() {
   # context/ should not be overwritten (idempotency guard)
   run grep "# My custom context" "$TEMP_DIR/context/principles.md"
   [ "$status" -eq 0 ]
+}
+
+@test "ccm init: auto-commits generated files" {
+  cd "$TEMP_DIR" && git init -q
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+    CCM_GITHUB_USER=testuser CCM_PROJECT_NAME=testproject \
+    CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" init
+  [ "$status" -eq 0 ]
+  run git -C "$TEMP_DIR" log --oneline
+  [[ "$output" == *"chore: init CCM meta-repo"* ]]
+}
+
+@test "ccm init: output has no Naechste Schritte block" {
+  cd "$TEMP_DIR" && git init -q
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+    CCM_GITHUB_USER=testuser CCM_PROJECT_NAME=testproject \
+    CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" init
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Nächste Schritte"* ]]
+  [[ "$output" != *"git push"* ]]
+}
+
+@test "ccm init: skips commit on re-run" {
+  cd "$TEMP_DIR" && git init -q
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+    CCM_GITHUB_USER=testuser CCM_PROJECT_NAME=testproject \
+    CCM_SKIP_PUSH=1 \
+    bash "$BATS_TEST_DIRNAME/../bin/ccm" init
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+    CCM_GITHUB_USER=testuser CCM_PROJECT_NAME=testproject \
+    CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" init
+  [ "$status" -eq 0 ]
+  count=$(git -C "$TEMP_DIR" log --oneline | grep -c "chore: init CCM meta-repo" || true)
+  [ "$count" -eq 1 ]
+}
+
+@test "ccm init: auto-pushes when remote is reachable" {
+  cd "$TEMP_DIR" && git init -q
+
+  # Set up bare repo as remote before init so init can push to it
+  git init --bare "$TEMP_DIR/remote.git" -q
+  git -C "$TEMP_DIR" remote add origin "$TEMP_DIR/remote.git"
+  # Ensure local branch is named 'main' (ccm init pushes to origin/main)
+  git -C "$TEMP_DIR" checkout -b main 2>/dev/null || true
+
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+    CCM_GITHUB_USER=testuser CCM_PROJECT_NAME=testproject \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" init
+  [ "$status" -eq 0 ]
+
+  run git -C "$TEMP_DIR/remote.git" log --oneline
+  [[ "$output" == *"chore: init CCM meta-repo"* ]]
 }

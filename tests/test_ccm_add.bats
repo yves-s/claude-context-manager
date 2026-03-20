@@ -1,6 +1,17 @@
 # tests/test_ccm_add.bats
 # setup() and teardown() are fully defined below — test_helper not needed here.
 
+_setup_meta() {
+  # Clean slate — remove any files setup() may have placed in meta/
+  rm -rf "$TEMP_DIR/meta" "$TEMP_DIR/.ccm"
+  mkdir -p "$TEMP_DIR/meta"
+  cd "$TEMP_DIR/meta" && git init -q
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+    CCM_GITHUB_USER=testuser CCM_PROJECT_NAME=testmeta \
+    CCM_SKIP_PUSH=1 \
+    bash "$BATS_TEST_DIRNAME/../bin/ccm" init
+}
+
 setup() {
   TEMP_DIR=$(mktemp -d)  # explicit — do not rely on test_helper here
 
@@ -62,4 +73,113 @@ _run_add() {
   [ "$status" -eq 0 ]
   run grep "# My custom section" "$SUB_DIR/CLAUDE.md"
   [ "$status" -eq 0 ]
+}
+
+@test "ccm add: generated CLAUDE.md has no placeholder sections" {
+  cd "$SUB_DIR"
+  run _run_add
+  [ "$status" -eq 0 ]
+  run grep "Projektbeschreibung" "$SUB_DIR/CLAUDE.md"
+  [ "$status" -ne 0 ]  # must not contain placeholder sections
+  run grep "PROJECT CONTEXT BELOW" "$SUB_DIR/CLAUDE.md"
+  [ "$status" -eq 0 ]  # marker must still be present
+}
+
+@test "ccm add: auto-commits CLAUDE.md and .ccm" {
+  _setup_meta
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+  run git log --oneline
+  [[ "$output" == *"chore: add CCM context"* ]]
+}
+
+@test "ccm add: output has no Naechste Schritte block" {
+  _setup_meta
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+  run echo "$output"
+  [[ "$output" != *"Nächste Schritte"* ]]
+  [[ "$output" != *"git add"* ]]
+}
+
+@test "ccm add: skips commit on re-run (idempotent)" {
+  _setup_meta
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_SKIP_PUSH=1 \
+    bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  # Verify first run created exactly one commit
+  run git log --oneline
+  [ "$status" -eq 0 ]
+  count1=$(echo "$output" | grep -c "chore: add CCM context" || true)
+  [ "$count1" -eq 1 ]
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+  run git log --oneline
+  [ "$status" -eq 0 ]
+  # Only one CCM commit, not two
+  count=$(echo "$output" | grep -c "chore: add CCM context" || true)
+  [ "$count" -eq 1 ]
+}
+
+@test "ccm add: does not commit pre-existing staged changes" {
+  _setup_meta
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  # Stage a file before running ccm add
+  echo "my work" > myfile.txt
+  git add myfile.txt
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_SKIP_PUSH=1 \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+  # myfile.txt must NOT be in the CCM commit
+  run git show --name-only HEAD
+  [[ "$output" != *"myfile.txt"* ]]
+  # myfile.txt must still be staged
+  run git diff --cached --name-only
+  [[ "$output" == *"myfile.txt"* ]]
+}
+
+@test "ccm add: auto-pushes when remote is configured" {
+  _setup_meta
+
+  # Bare repo acts as remote
+  git init --bare "$TEMP_DIR/remote.git" -q
+
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  git remote add origin "$TEMP_DIR/remote.git"
+  # Initial commit needed before push can set upstream
+  git commit --allow-empty -m "initial"
+  git push -u origin HEAD
+
+  CCM_HOME="$TEMP_DIR/.ccm" \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+
+  # CCM commit must exist in the remote
+  run git -C "$TEMP_DIR/remote.git" log --oneline
+  [[ "$output" == *"chore: add CCM context"* ]]
+}
+
+@test "ccm add: output shows branch name on successful push" {
+  _setup_meta
+  git init --bare "$TEMP_DIR/remote.git" -q
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  git remote add origin "$TEMP_DIR/remote.git"
+  git commit --allow-empty -m "initial"
+  git push -u origin HEAD
+
+  CCM_HOME="$TEMP_DIR/.ccm" \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Push:       →"* ]]
 }
