@@ -90,3 +90,21 @@ _run_init() {
   count=$(git -C "$TEMP_DIR" log --oneline | grep -c "chore: init CCM meta-repo" || true)
   [ "$count" -eq 1 ]
 }
+
+@test "ccm init: auto-pushes when remote is reachable" {
+  cd "$TEMP_DIR" && git init -q
+
+  # Set up bare repo as remote before init so init can push to it
+  git init --bare "$TEMP_DIR/remote.git" -q
+  git -C "$TEMP_DIR" remote add origin "$TEMP_DIR/remote.git"
+  # Ensure local branch is named 'main' (ccm init pushes to origin/main)
+  git -C "$TEMP_DIR" checkout -b main 2>/dev/null || true
+
+  CCM_HOME="$TEMP_DIR/.ccm" CCM_NON_INTERACTIVE=1 \
+    CCM_GITHUB_USER=testuser CCM_PROJECT_NAME=testproject \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" init
+  [ "$status" -eq 0 ]
+
+  run git -C "$TEMP_DIR/remote.git" log --oneline
+  [[ "$output" == *"chore: init CCM meta-repo"* ]]
+}

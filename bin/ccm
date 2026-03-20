@@ -94,11 +94,9 @@ cmd_init() {
   if git diff --cached --quiet; then
     CCM_COMMIT_STATUS="— keine Änderungen"
     CCM_PUSH_STATUS="— übersprungen"
-    CCM_DID_COMMIT=0
   else
     git commit -m 'chore: init CCM meta-repo'
     CCM_COMMIT_STATUS="chore: init CCM meta-repo"
-    CCM_DID_COMMIT=1
 
     REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
     if [[ -z "$REMOTE_URL" ]]; then
