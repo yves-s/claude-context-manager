@@ -63,3 +63,13 @@ _run_add() {
   run grep "# My custom section" "$SUB_DIR/CLAUDE.md"
   [ "$status" -eq 0 ]
 }
+
+@test "ccm add: generated CLAUDE.md has no placeholder sections" {
+  cd "$SUB_DIR"
+  run _run_add
+  [ "$status" -eq 0 ]
+  run grep "Projektbeschreibung" "$SUB_DIR/CLAUDE.md"
+  [ "$status" -ne 0 ]  # must not contain placeholder sections
+  run grep "PROJECT CONTEXT BELOW" "$SUB_DIR/CLAUDE.md"
+  [ "$status" -eq 0 ]  # marker must still be present
+}
