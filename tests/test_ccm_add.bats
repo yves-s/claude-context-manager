@@ -146,3 +146,40 @@ _run_add() {
   run git diff --cached --name-only
   [[ "$output" == *"myfile.txt"* ]]
 }
+
+@test "ccm add: auto-pushes when remote is configured" {
+  _setup_meta
+
+  # Bare repo acts as remote
+  git init --bare "$TEMP_DIR/remote.git" -q
+
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  git remote add origin "$TEMP_DIR/remote.git"
+  # Initial commit needed before push can set upstream
+  git commit --allow-empty -m "initial"
+  git push -u origin HEAD
+
+  CCM_HOME="$TEMP_DIR/.ccm" \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+
+  # CCM commit must exist in the remote
+  run git -C "$TEMP_DIR/remote.git" log --oneline
+  [[ "$output" == *"chore: add CCM context"* ]]
+}
+
+@test "ccm add: output shows branch name on successful push" {
+  _setup_meta
+  git init --bare "$TEMP_DIR/remote.git" -q
+  mkdir -p "$TEMP_DIR/sub"
+  cd "$TEMP_DIR/sub" && git init -q
+  git remote add origin "$TEMP_DIR/remote.git"
+  git commit --allow-empty -m "initial"
+  git push -u origin HEAD
+
+  CCM_HOME="$TEMP_DIR/.ccm" \
+    run bash "$BATS_TEST_DIRNAME/../bin/ccm" add
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Push:       →"* ]]
+}
