@@ -1,6 +1,5 @@
 // apps/web/src/components/repos/context-block.tsx
 import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { Repo } from '@/lib/data/types'
 import { formatDistanceToNow } from 'date-fns'
 import { de } from 'date-fns/locale'
