@@ -7,10 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { Session } from '@/lib/data/types'
 import { formatDistanceToNow } from 'date-fns'
 import { de } from 'date-fns/locale'
-
-function initials(name: string) {
-  return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
-}
+import { initials } from '@/lib/utils/initials'
 
 interface Props {
   sessions: Session[]
@@ -40,6 +37,12 @@ export function SessionsTable({ sessions, githubConnected }: Props) {
           ))}
         </TableBody>
       </Table>
+    )
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground px-4 py-6 text-center">Noch keine Sessions.</p>
     )
   }
 

@@ -3,10 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Contributor } from '@/lib/data/types'
-
-function initials(name: string) {
-  return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
-}
+import { initials } from '@/lib/utils/initials'
 
 interface Props {
   contributors: Contributor[]
@@ -25,6 +22,12 @@ export function ContributorsPanel({ contributors, githubConnected }: Props) {
           </div>
         ))}
       </div>
+    )
+  }
+
+  if (contributors.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-4">Keine Contributors.</p>
     )
   }
 

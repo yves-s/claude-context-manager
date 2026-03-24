@@ -3,10 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Member } from '@/lib/data/types'
-
-function initials(name: string) {
-  return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
-}
+import { initials } from '@/lib/utils/initials'
 
 const roleVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
   owner: 'default',

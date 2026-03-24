@@ -4,10 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { ActivityEntry } from '@/lib/data/types'
 import { formatDistanceToNow } from 'date-fns'
 import { de } from 'date-fns/locale'
-
-function initials(name: string) {
-  return name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()
-}
+import { initials } from '@/lib/utils/initials'
 
 interface Props {
   activity: ActivityEntry[]

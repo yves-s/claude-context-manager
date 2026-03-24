@@ -9,6 +9,5 @@ export async function getOrgData(_orgSlug: string): Promise<OrgData> {
 }
 
 export async function getRepoData(_orgSlug: string, repoSlug: string): Promise<Repo | null> {
-  const data = await getOrgData(_orgSlug)
-  return data.repos.find(r => r.slug === repoSlug) ?? null
+  return fixtureOrgData.repos.find(r => r.slug === repoSlug) ?? null
 }
