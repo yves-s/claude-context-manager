@@ -58,8 +58,8 @@ export function AppSidebar({ orgSlug, orgName, role, repos }: Props) {
 
         <SidebarGroup>
           <SidebarGroupLabel>Repos</SidebarGroupLabel>
-          <SidebarMenu>
-            <ScrollArea className={repos.length > 10 ? 'h-64' : undefined}>
+          <ScrollArea className={repos.length > 10 ? 'h-64' : undefined}>
+            <SidebarMenu>
               {repos.map(repo => {
                 const status = repoStatus(repo)
                 return (
@@ -76,8 +76,8 @@ export function AppSidebar({ orgSlug, orgName, role, repos }: Props) {
                   </SidebarMenuItem>
                 )
               })}
-            </ScrollArea>
-          </SidebarMenu>
+            </SidebarMenu>
+          </ScrollArea>
         </SidebarGroup>
 
         <SidebarGroup>
