@@ -26,4 +26,14 @@ describe('repoStatus', () => {
   it('returns inaktiv when no lastSyncAt', () => {
     expect(repoStatus({ hasClaudeMd: true, lastSyncAt: undefined }, now)).toBe('inaktiv')
   })
+
+  it('returns aktiv when last sync is exactly 7 days ago', () => {
+    const d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    expect(repoStatus({ hasClaudeMd: true, lastSyncAt: d }, now)).toBe('aktiv')
+  })
+
+  it('returns ruhig when last sync is exactly 30 days ago', () => {
+    const d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    expect(repoStatus({ hasClaudeMd: true, lastSyncAt: d }, now)).toBe('ruhig')
+  })
 })
