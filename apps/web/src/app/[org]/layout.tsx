@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { OrgProvider } from '@/providers/org-provider'
-import { OrgSwitcher } from '@/components/org/org-switcher'
+import { AppSidebar } from '@/components/layout/app-sidebar'
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
+import { getOrgData } from '@/lib/data/org'
+import { Separator } from '@/components/ui/separator'
 
 interface Props {
   children: React.ReactNode
@@ -11,37 +14,43 @@ interface Props {
 }
 
 export default async function OrgLayout({ children, params }: Props) {
-  await params  // params must be awaited in Next.js 15+ even if unused
+  const { org: orgSlug } = await params
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  // Middleware already validated membership and set these headers
   const headersList = await headers()
   const orgId = headersList.get('x-org-id')
   const orgRole = headersList.get('x-org-role')
   if (!orgId || !orgRole) redirect('/select-org')
 
-  // Fetch org name (id already known from header — one lightweight query)
   const { data: org } = await supabase
     .from('organizations')
     .select('name, slug')
     .eq('id', orgId)
     .single()
-
   if (!org) redirect('/select-org')
+
+  const orgData = await getOrgData(orgSlug)
 
   return (
     <OrgProvider value={{ orgId, orgSlug: org.slug, orgName: org.name, role: orgRole }}>
-      <div className="min-h-screen flex flex-col">
-        <header className="border-b px-4 py-3 flex items-center gap-4">
-          <span className="font-semibold text-sm">CCM</span>
-          <OrgSwitcher currentOrg={{ name: org.name, slug: org.slug }} userId={user.id} />
-          <span className="ml-auto text-xs text-muted-foreground capitalize">{orgRole}</span>
-        </header>
-        <main className="flex-1 p-4">{children}</main>
-      </div>
+      <SidebarProvider>
+        <AppSidebar
+          orgSlug={org.slug}
+          orgName={org.name}
+          role={orgRole}
+          repos={orgData.repos}
+        />
+        <SidebarInset>
+          <header className="flex h-12 items-center gap-2 px-4 border-b">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="h-4" />
+          </header>
+          <main className="flex-1 p-6">{children}</main>
+        </SidebarInset>
+      </SidebarProvider>
     </OrgProvider>
   )
 }
