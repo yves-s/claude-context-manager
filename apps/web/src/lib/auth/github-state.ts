@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 function getSecret(): string {
   const secret = process.env.GITHUB_CLIENT_SECRET
@@ -15,6 +15,12 @@ export function generateGithubState(orgId: string): string {
   return Buffer.from(payload).toString('base64url')
 }
 
+/**
+ * Verifies a GitHub OAuth CSRF state token.
+ * @param state - base64url-encoded token from generateGithubState
+ * @param maxAgeMs - max token age in ms (default 10 min). Use 0 to always expire.
+ * @returns { orgId } if valid, null if tampered, expired, or malformed
+ */
 export function verifyGithubState(
   state: string,
   maxAgeMs = 10 * 60 * 1000
@@ -25,11 +31,14 @@ export function verifyGithubState(
     if (typeof orgId !== 'string' || typeof timestamp !== 'string' || typeof sig !== 'string') {
       return null
     }
+    if (!/^\d+$/.test(timestamp)) return null
     if (Date.now() - Number(timestamp) >= maxAgeMs) return null
     const hmac = createHmac('sha256', getSecret())
     hmac.update(`${orgId}:${timestamp}`)
     const expected = hmac.digest('hex')
-    if (sig !== expected) return null
+    const sigBuf = Buffer.from(sig, 'hex')
+    const expectedBuf = Buffer.from(expected, 'hex')
+    if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) return null
     return { orgId }
   } catch {
     return null
