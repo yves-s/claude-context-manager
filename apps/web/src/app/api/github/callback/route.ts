@@ -3,6 +3,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { verifyGithubState } from '@/lib/auth/github-state'
 
 export async function GET(request: NextRequest) {
+  // Auth is not re-verified here: the HMAC-verified state token (issued by /connect after
+  // role check) is the proof of authorization. The 10-min expiry limits the attack window.
   const { searchParams } = request.nextUrl
   const code = searchParams.get('code')
   const stateParam = searchParams.get('state')
@@ -58,6 +60,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Store token in DB
+  // TODO: remove `as any` once Supabase types are regenerated after migration 0002
   const service = createServiceClient()
   const { error } = await service
     .from('organizations')
@@ -73,8 +76,9 @@ export async function GET(request: NextRequest) {
     .eq('id', orgId)
     .single()
 
-  const slug = org?.slug ?? ''
-  const response = NextResponse.redirect(new URL(`/${slug}/settings`, request.url))
+  if (!org?.slug) return redirectToSettingsWithError(request)
+
+  const response = NextResponse.redirect(new URL(`/${org.slug}/settings`, request.url))
 
   // Clear the state cookie
   response.cookies.delete('github_oauth_state')
