@@ -5,11 +5,12 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { MemberList } from '@/components/org/member-list'
 import { InviteForm } from '@/components/org/invite-form'
+import { GithubConnect } from '@/components/org/github-connect'
 
 interface Props { params: Promise<{ org: string }> }
 
 export default async function SettingsPage({ params }: Props) {
-  await params  // required in Next.js 15+
+  const { org: orgSlug } = await params
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,7 +26,7 @@ export default async function SettingsPage({ params }: Props) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('name')
+    .select('name, github_org')
     .eq('id', orgId)
     .single()
   if (!org) redirect('/select-org')
@@ -66,6 +67,15 @@ export default async function SettingsPage({ params }: Props) {
         .then(({ data }) => data ?? [])
     : []
 
+  // Count synced repos for GitHub section
+  const { count: syncedRepoCount } = canManage
+    ? await service
+        .from('synced_repos')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .then(r => r)
+    : { count: 0 }
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   return (
@@ -89,6 +99,18 @@ export default async function SettingsPage({ params }: Props) {
           canManage={canManage}
         />
       </section>
+
+      {canManage && (
+        <section>
+          <h2 className="text-base font-medium mb-3">GitHub</h2>
+          <GithubConnect
+            orgId={orgId}
+            orgSlug={orgSlug}
+            githubOrg={(org as any).github_org ?? null}
+            repoCount={syncedRepoCount ?? 0}
+          />
+        </section>
+      )}
     </div>
   )
 }
