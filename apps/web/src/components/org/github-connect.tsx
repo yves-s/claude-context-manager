@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { disconnectGitHub } from '@/lib/github/actions'
 
 interface Props {
@@ -15,10 +15,12 @@ export function GithubConnect({ orgId, orgSlug, githubOrg, repoCount = 0 }: Prop
   const searchParams = useSearchParams()
   const hasError = searchParams.get('github_error') === 'true'
   const [isPending, startTransition] = useTransition()
+  const [disconnectError, setDisconnectError] = useState<string | null>(null)
 
   function handleDisconnect() {
     startTransition(async () => {
-      await disconnectGitHub(orgId, orgSlug)
+      const result = await disconnectGitHub(orgId, orgSlug)
+      if (result.error) setDisconnectError(result.error)
     })
   }
 
@@ -46,12 +48,16 @@ export function GithubConnect({ orgId, orgSlug, githubOrg, repoCount = 0 }: Prop
           )}
           <div className="px-4 py-2">
             <button
+              type="button"
               onClick={handleDisconnect}
               disabled={isPending}
               className="text-xs text-destructive hover:underline disabled:opacity-50"
             >
               {isPending ? 'Wird getrennt…' : 'GitHub trennen'}
             </button>
+            {disconnectError && (
+              <p className="text-xs text-destructive mt-1">{disconnectError}</p>
+            )}
           </div>
         </div>
       ) : (

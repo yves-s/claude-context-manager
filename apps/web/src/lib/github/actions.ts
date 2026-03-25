@@ -27,7 +27,12 @@ export async function disconnectGitHub(
   }
 
   // Delete synced repos first (cascades to repo_commits + repo_embeddings)
-  await service.from('synced_repos').delete().eq('organization_id', orgId)
+  const { error: deleteError } = await service
+    .from('synced_repos')
+    .delete()
+    .eq('organization_id', orgId)
+
+  if (deleteError) return { error: deleteError.message }
 
   // Clear token
   // TODO: remove `as any` once Supabase types are regenerated after migration 0002
