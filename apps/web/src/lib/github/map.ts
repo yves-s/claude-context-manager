@@ -69,7 +69,8 @@ export function buildContributors(
         count: 0,
       })
     }
-    map.get(key)!.count++
+    const entry = map.get(key)
+    if (entry) entry.count++
   }
 
   return Array.from(map.values())

@@ -54,6 +54,12 @@ describe('mapCommitToActivityEntry', () => {
     expect(entry.repoName).toBe('Dashboard')
     expect(entry.userName).toBe('Alice')
   })
+
+  it('falls back to author_name when no member match', () => {
+    const entry = mapCommitToActivityEntry(commit, 'dashboard', 'Dashboard', new Map())
+    expect(entry.userId).toBe('')
+    expect(entry.userName).toBe('Alice')
+  })
 })
 
 describe('buildContributors', () => {
@@ -69,5 +75,18 @@ describe('buildContributors', () => {
     expect(contributors[0].sessionCount).toBe(2)
     expect(contributors[1].name).toBe('Bob')
     expect(contributors[1].sessionCount).toBe(1)
+  })
+
+  it('groups commit with null email by author name', () => {
+    const nullEmailCommit = { ...commit, id: '4', author_email: null, author_name: 'Charlie' }
+    const contributors = buildContributors([nullEmailCommit], new Map())
+    expect(contributors[0].name).toBe('Charlie')
+    expect(contributors[0].sessionCount).toBe(1)
+  })
+
+  it('groups commit with null email and null name under unknown', () => {
+    const anonymousCommit = { ...commit, id: '5', author_email: null, author_name: null }
+    const contributors = buildContributors([anonymousCommit], new Map())
+    expect(contributors[0].name).toBe('Unknown')
   })
 })
