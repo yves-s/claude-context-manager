@@ -26,7 +26,7 @@ async function loadMembers(
   for (const result of userResults) {
     const user = result.data.user
     if (!user) continue
-    const memberRow = membersRaw!.find(m => m.user_id === user.id)
+    const memberRow = (membersRaw ?? []).find(m => m.user_id === user.id)
     if (!memberRow) continue
 
     const info: MemberInfo = {
@@ -93,7 +93,7 @@ export async function getOrgData(orgSlug: string): Promise<OrgData> {
     .in('repo_id', repoIds)
     .gte('committed_at', fourteenDaysAgo)
 
-  // Total counts
+  // Total counts — SCALE: this loads all commit rows; replace with per-repo COUNT aggregate before production
   const { data: allCommits } = await service
     .from('repo_commits')
     .select('repo_id')
@@ -102,7 +102,7 @@ export async function getOrgData(orgSlug: string): Promise<OrgData> {
   // 20 newest commits across all repos for recentActivity
   const { data: activityCommits } = await service
     .from('repo_commits')
-    .select('id, repo_id, author_name, author_email, message, files_changed, committed_at')
+    .select('id, repo_id, commit_sha, author_name, author_email, message, files_changed, committed_at')
     .in('repo_id', repoIds)
     .order('committed_at', { ascending: false })
     .limit(20)
@@ -143,7 +143,7 @@ export async function getOrgData(orgSlug: string): Promise<OrgData> {
   const recentActivity = (activityCommits ?? []).map(c => {
     const repo = repoById.get(c.repo_id as string)
     return mapCommitToActivityEntry(
-      c as unknown as CommitRow,
+      c as CommitRow,
       repo?.slug as string ?? '',
       repo?.name as string ?? '',
       memberByEmail
