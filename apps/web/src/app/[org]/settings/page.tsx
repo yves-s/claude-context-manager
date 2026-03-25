@@ -24,12 +24,13 @@ export default async function SettingsPage({ params }: Props) {
 
   const canManage = ['owner', 'admin'].includes(orgRole)
 
-  const { data: org } = await supabase
+  const { data: orgData } = await supabase
     .from('organizations')
     .select('name, github_org')
     .eq('id', orgId)
     .single()
-  if (!org) redirect('/select-org')
+  if (!orgData) redirect('/select-org')
+  const org = orgData as { name: string; github_org: string | null }
 
   // Fetch members (id, user_id, role, joined_at)
   const { data: membersRaw } = await supabase
@@ -73,7 +74,6 @@ export default async function SettingsPage({ params }: Props) {
         .from('synced_repos')
         .select('id', { count: 'exact', head: true })
         .eq('organization_id', orgId)
-        .then(r => r)
     : { count: 0 }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
@@ -106,7 +106,7 @@ export default async function SettingsPage({ params }: Props) {
           <GithubConnect
             orgId={orgId}
             orgSlug={orgSlug}
-            githubOrg={(org as any).github_org ?? null}
+            githubOrg={org.github_org}
             repoCount={syncedRepoCount ?? 0}
           />
         </section>
