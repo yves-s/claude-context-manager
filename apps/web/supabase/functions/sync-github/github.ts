@@ -41,7 +41,7 @@ export async function listOrgRepos(githubOrg: string, token: string): Promise<Gi
   const res = await withRetry(() => githubFetch(`/orgs/${githubOrg}/repos?per_page=100`, token))
   if (res.status === 401) throw new Error('GITHUB_401')
   if (!res.ok) return []
-  return res.json()
+  return res.json() as Promise<GithubRepo[]>
 }
 
 export async function fetchClaudeMd(fullName: string, token: string): Promise<string | null> {
@@ -63,5 +63,5 @@ export async function fetchCommits(
   const url = `/repos/${fullName}/commits?since=${since}&per_page=100`
   const res = await withRetry(() => githubFetch(url, token))
   if (!res.ok) return []
-  return res.json()
+  return res.json() as Promise<GithubCommit[]>
 }

@@ -50,7 +50,7 @@ Deno.serve(async () => {
       // Capture old context BEFORE upsert (needed for embedding change detection)
       const { data: existingRepo } = await supabase
         .from('synced_repos')
-        .select('context')
+        .select('context, synced_at')
         .eq('organization_id', org.id)
         .eq('slug', slug)
         .maybeSingle()
@@ -71,7 +71,7 @@ Deno.serve(async () => {
           },
           { onConflict: 'organization_id,slug' }
         )
-        .select('id, synced_at')
+        .select('id')
         .single()
 
       if (repoErr || !repoRow) {
@@ -80,10 +80,13 @@ Deno.serve(async () => {
       }
 
       // Determine since date for commits
+      // Use pre-upsert synced_at: on first run existingRepo is null so we fall back to 90 days ago
       const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-      const since = repoRow.synced_at ?? ninetyDaysAgo
+      const since = existingRepo?.synced_at ?? ninetyDaysAgo
 
-      // Fetch + upsert commits
+      // Note: synced_at advances even if fetchCommits returned [] due to an API failure (withRetry
+      // exhausted). This means a failed fetch window is skipped on next run. Acceptable for MVP;
+      // fix by returning null vs [] from fetchCommits to distinguish failure from empty.
       const commits = await fetchCommits(repo.full_name, token, since)
       if (commits.length > 0) {
         const commitRows = commits.map(c => ({
@@ -92,7 +95,7 @@ Deno.serve(async () => {
           author_name: c.commit.author?.name ?? null,
           author_email: c.commit.author?.email ?? null,
           message: c.commit.message,
-          files_changed: 0,
+          files_changed: 0, // not available from list endpoint; requires per-commit detail call (N+1)
           committed_at: c.commit.author?.date ?? new Date().toISOString(),
         }))
 
