@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { extractContext, extractStack } from './parse'
 
-const TECH_LIST = ['Next.js', 'React', 'Vue', 'Angular', 'Svelte', 'Supabase', 'PostgreSQL', 'MySQL', 'TypeScript', 'JavaScript', 'Python', 'Go', 'Rust', 'Swift', 'Kotlin', 'Docker']
-
 describe('extractContext', () => {
   it('returns null for empty content', () => {
     expect(extractContext('')).toBeNull()
@@ -71,6 +69,16 @@ describe('extractStack', () => {
     const result = extractStack(content)
     expect(result).toContain('next.js')
     expect(result).toContain('postgresql')
+  })
+
+  it('extracts from table rows where tech is in second column', () => {
+    const content = `## Stack
+| Frontend | Next.js |
+| Database | Supabase |
+`
+    const result = extractStack(content)
+    expect(result).toContain('next.js')
+    expect(result).toContain('supabase')
   })
 
   it('falls back to keyword matching on full text', () => {

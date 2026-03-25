@@ -8,6 +8,15 @@ const TECH_KEYWORDS = [
 const SECTION_HEADER_RE = /^##\s+(Stack|Tech)\s*$/im
 
 /**
+ * Matches text against a keyword using word boundaries to avoid false positives.
+ * For example, "go" won't match within "mongo".
+ */
+function matchesKeyword(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`\\b${escaped}\\b`, 'i').test(text)
+}
+
+/**
  * Extracts the project context from CLAUDE.md content.
  * Returns content after <!-- PROJECT CONTEXT BELOW --> if present,
  * otherwise returns the full content. Returns null if content is empty.
@@ -48,10 +57,14 @@ export function extractStack(content: string): string[] {
         items.push(bulletMatch[1].trim().toLowerCase())
         continue
       }
-      // Table row: "| Next.js | ..."
-      const tableMatch = line.match(/^\|\s*([^|]+?)\s*\|/)
-      if (tableMatch && !tableMatch[1].startsWith('-')) {
-        items.push(tableMatch[1].trim().toLowerCase())
+      // Table row: scan all cells against keyword list
+      if (line.trim().startsWith('|') && !line.includes('---')) {
+        const cells = line.split('|').slice(1, -1).map(c => c.trim().toLowerCase())
+        for (const cell of cells) {
+          if (TECH_KEYWORDS.some(kw => matchesKeyword(cell, kw))) {
+            items.push(cell)
+          }
+        }
       }
     }
 
@@ -61,7 +74,6 @@ export function extractStack(content: string): string[] {
   }
 
   // Fallback: keyword match on full text
-  const lower = content.toLowerCase()
-  const found = TECH_KEYWORDS.filter(kw => lower.includes(kw))
+  const found = TECH_KEYWORDS.filter(kw => matchesKeyword(content, kw))
   return [...new Set(found)].slice(0, 10)
 }
