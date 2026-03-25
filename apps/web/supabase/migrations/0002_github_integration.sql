@@ -48,7 +48,8 @@ CREATE TABLE repo_embeddings (
   UNIQUE(repo_id)
 );
 
-CREATE INDEX ON repo_embeddings USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX repo_embeddings_vector_idx ON repo_embeddings USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX synced_repos_org_idx ON synced_repos (organization_id);
 
 -- RLS: activate but no policies = deny all non-service-role access
 ALTER TABLE synced_repos ENABLE ROW LEVEL SECURITY;
