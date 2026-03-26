@@ -1,0 +1,36 @@
+{
+  "name": "claude-context-manager",
+  "description": "Meta-Repo für Claude Context Sync — Framework für das Synchronisieren von Claude-Kontext über Sub-Projekte hinweg",
+  "stack": {
+    "framework": "Next.js 16.2.0 (App Router)",
+    "language": "TypeScript",
+    "styling": "Tailwind CSS v4",
+    "database": "Supabase (PostgreSQL)",
+    "orm": null,
+    "testing": "Vitest",
+    "package_manager": "npm"
+  },
+  "build": {
+    "web": "npm run build",
+    "dev": "npm run dev",
+    "test": "npx vitest run"
+  },
+  "paths": {
+    "components": "apps/web/src/components",
+    "pages": "apps/web/src/app",
+    "lib": "apps/web/src/lib"
+  },
+  "supabase": {
+    "project_id": ""
+  },
+  "pipeline": {
+    "workspace": "agentic-dev",
+    "workspace_id": "421dffa5-5f2e-44a8-bdc1-7e0f31a87149",
+    "project_id": "ddab92d9-84dc-4c76-a2e4-b4047d94178b",
+    "project_name": null
+  },
+  "conventions": {
+    "commit_format": "conventional",
+    "language": "de"
+  }
+}

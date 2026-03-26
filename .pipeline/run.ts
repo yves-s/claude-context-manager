@@ -1,0 +1,367 @@
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { execSync } from "node:child_process";
+import { loadProjectConfig, parseCliArgs, type TicketArgs } from "./lib/config.ts";
+import { loadAgents, loadOrchestratorPrompt } from "./lib/load-agents.ts";
+import { createEventHooks, postPipelineEvent, type EventConfig } from "./lib/event-hooks.ts";
+
+// --- Exported pipeline function (used by worker.ts) ---
+export interface PipelineOptions {
+  projectDir: string;
+  ticket: TicketArgs;
+  abortSignal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+export interface PipelineResult {
+  status: "completed" | "failed" | "paused";
+  exitCode: number;
+  branch: string;
+  project: string;
+  failureReason?: string;
+  sessionId?: string;
+}
+
+export async function executePipeline(opts: PipelineOptions): Promise<PipelineResult> {
+  const { projectDir, ticket, abortSignal } = opts;
+  const config = loadProjectConfig(projectDir);
+
+  let pauseReason: string | undefined;
+  let sessionId: string | undefined;
+
+  // --- Git: create feature branch ---
+  const branchSlug = ticket.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 40);
+  const branchName = `${config.conventions.branch_prefix}${ticket.ticketId}-${branchSlug}`;
+
+  try {
+    execSync("git checkout main", { cwd: projectDir, stdio: "pipe" });
+    execSync("git pull origin main", { cwd: projectDir, stdio: "pipe" });
+  } catch { /* continue */ }
+
+  try {
+    execSync(`git checkout -b ${branchName}`, { cwd: projectDir, stdio: "pipe" });
+  } catch {
+    execSync(`git checkout ${branchName}`, { cwd: projectDir, stdio: "pipe" });
+  }
+
+  // --- Load agents + orchestrator prompt ---
+  const agents = loadAgents(projectDir);
+  const orchestratorPrompt = loadOrchestratorPrompt(projectDir);
+
+  // --- Event hooks ---
+  const hasPipeline = !!(config.pipeline.apiUrl && config.pipeline.apiKey);
+  const eventConfig: EventConfig = {
+    apiUrl: config.pipeline.apiUrl,
+    apiKey: config.pipeline.apiKey,
+    ticketNumber: ticket.ticketId,
+  };
+  const hooks = hasPipeline ? createEventHooks(eventConfig, {
+    onPause: (reason) => { pauseReason = reason; },
+  }) : {};
+
+  // --- Build prompt ---
+  const prompt = `${orchestratorPrompt}
+
+Implementiere folgendes Ticket end-to-end:
+
+Ticket-ID: ${ticket.ticketId}
+Titel: ${ticket.title}
+Beschreibung: ${ticket.description}
+Labels: ${ticket.labels}
+
+Folge deinem Workflow:
+1. Lies project.json und CLAUDE.md für Projekt-Kontext
+2. Plane die Implementierung (Phase 1)
+3. Spawne die nötigen Experten-Agents (Phase 2: Implementierung)
+4. Build-Check + QA Review (Phase 3-4)
+5. Ship: Commit, Push, PR erstellen (Phase 5) — KEIN Merge
+
+Branch ist bereits erstellt: ${branchName}`;
+
+  // --- Timeout configuration ---
+  const DEFAULT_TIMEOUT_MS = 1_800_000; // 30 minutes
+  const MIN_TIMEOUT_MS = 60_000; // 1 minute minimum
+  const MAX_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 hours max
+
+  let timeoutMs = opts.timeoutMs ?? (Number(process.env.PIPELINE_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
+
+  // SECURITY: Validate timeout value bounds
+  if (!Number.isFinite(timeoutMs) || timeoutMs < MIN_TIMEOUT_MS || timeoutMs > MAX_TIMEOUT_MS) {
+    console.warn(`Invalid timeout ${timeoutMs}ms, using default ${DEFAULT_TIMEOUT_MS}ms`);
+    timeoutMs = DEFAULT_TIMEOUT_MS;
+  }
+
+  const timeoutMinutes = Math.round(timeoutMs / 60_000);
+
+  // --- Abort controller: combines external signal + wall-clock timeout ---
+  const queryAbortController = new AbortController();
+  let timedOut = false;
+
+  // Forward external abort signal (graceful shutdown)
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      queryAbortController.abort();
+    } else {
+      abortSignal.addEventListener("abort", () => queryAbortController.abort(), { once: true });
+    }
+  }
+
+  // Wall-clock timeout
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    queryAbortController.abort();
+  }, timeoutMs);
+
+  // --- Run orchestrator ---
+  let exitCode = 0;
+  let failureReason: string | undefined;
+  try {
+    if (hasPipeline) await postPipelineEvent(eventConfig, "agent_started", "orchestrator");
+
+    for await (const message of query({
+      prompt,
+      options: {
+        cwd: projectDir,
+        model: "opus",
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
+        allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent"],
+        agents,
+        hooks,
+        maxTurns: 200,
+        settingSources: ["project"],
+        persistSession: true,
+        abortController: queryAbortController,
+        env: {
+          TICKET_NUMBER: ticket.ticketId,
+          BOARD_API_URL: config.pipeline.apiUrl,
+          PIPELINE_KEY: config.pipeline.apiKey,
+        },
+      },
+    })) {
+      if (message.type === "result") {
+        const resultMsg = message as SDKMessage & { type: "result"; subtype: string };
+        if (resultMsg.subtype !== "success") {
+          console.error("[SDK Result]", resultMsg.subtype);
+          exitCode = 1;
+        }
+      }
+      // Extract session ID from any message that has it
+      if ('session_id' in message && typeof (message as Record<string, unknown>).session_id === 'string') {
+        sessionId = (message as Record<string, unknown>).session_id as string;
+      }
+    }
+
+    // Check if pipeline was paused for human input
+    if (pauseReason === 'human_in_the_loop') {
+      return {
+        status: "paused",
+        exitCode: 0,
+        branch: branchName,
+        project: config.name,
+        sessionId,
+      };
+    }
+
+    if (hasPipeline) await postPipelineEvent(eventConfig, "completed", "orchestrator");
+  } catch (error) {
+    exitCode = 1;
+    if (timedOut) {
+      failureReason = `Timeout nach ${timeoutMinutes} Minuten`;
+    } else {
+      failureReason = error instanceof Error ? error.message : String(error);
+    }
+    console.error(`Pipeline error: ${failureReason}`);
+    if (hasPipeline) await postPipelineEvent(eventConfig, "pipeline_failed", "orchestrator");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  return {
+    status: exitCode === 0 ? "completed" : "failed",
+    exitCode,
+    branch: branchName,
+    project: config.name,
+    failureReason,
+    sessionId,
+  };
+}
+
+// --- Resume a paused pipeline session ---
+export interface ResumeOptions {
+  projectDir: string;
+  ticket: TicketArgs;
+  sessionId: string;
+  answer: string;
+  abortSignal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+export async function resumePipeline(opts: ResumeOptions): Promise<PipelineResult> {
+  const { projectDir, ticket, sessionId: resumeSessionId, answer, abortSignal } = opts;
+  const config = loadProjectConfig(projectDir);
+
+  // Branch should already exist — just ensure we're on it
+  const branchSlug = ticket.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 40);
+  const branchName = `${config.conventions.branch_prefix}${ticket.ticketId}-${branchSlug}`;
+
+  try {
+    execSync(`git checkout ${branchName}`, { cwd: projectDir, stdio: "pipe" });
+  } catch { /* branch may already be checked out */ }
+
+  const agents = loadAgents(projectDir);
+  const hasPipeline = !!(config.pipeline.apiUrl && config.pipeline.apiKey);
+  const eventConfig: EventConfig = {
+    apiUrl: config.pipeline.apiUrl,
+    apiKey: config.pipeline.apiKey,
+    ticketNumber: ticket.ticketId,
+  };
+
+  let pauseReason: string | undefined;
+  let newSessionId: string | undefined;
+
+  const hooks = hasPipeline ? createEventHooks(eventConfig, {
+    onPause: (reason) => { pauseReason = reason; },
+  }) : {};
+
+  // Timeout
+  const DEFAULT_TIMEOUT_MS = 1_800_000;
+  const MIN_TIMEOUT_MS = 60_000;
+  const MAX_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+  let timeoutMs = opts.timeoutMs ?? (Number(process.env.PIPELINE_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
+  if (!Number.isFinite(timeoutMs) || timeoutMs < MIN_TIMEOUT_MS || timeoutMs > MAX_TIMEOUT_MS) {
+    timeoutMs = DEFAULT_TIMEOUT_MS;
+  }
+
+  const queryAbortController = new AbortController();
+  let timedOut = false;
+
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      queryAbortController.abort();
+    } else {
+      abortSignal.addEventListener("abort", () => queryAbortController.abort(), { once: true });
+    }
+  }
+
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    queryAbortController.abort();
+  }, timeoutMs);
+
+  let exitCode = 0;
+  let failureReason: string | undefined;
+
+  try {
+    if (hasPipeline) await postPipelineEvent(eventConfig, "agent_started", "orchestrator");
+
+    for await (const message of query({
+      prompt: `Antwort auf deine Frage: ${answer}\n\nMach weiter wo du aufgehört hast.`,
+      options: {
+        cwd: projectDir,
+        model: "opus",
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
+        allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent"],
+        agents,
+        hooks,
+        maxTurns: 200,
+        settingSources: ["project"],
+        persistSession: true,
+        resume: resumeSessionId,
+        abortController: queryAbortController,
+        env: {
+          TICKET_NUMBER: ticket.ticketId,
+          BOARD_API_URL: config.pipeline.apiUrl,
+          PIPELINE_KEY: config.pipeline.apiKey,
+        },
+      },
+    })) {
+      if (message.type === "result") {
+        const resultMsg = message as SDKMessage & { type: "result"; subtype: string };
+        if (resultMsg.subtype !== "success") {
+          console.error("[SDK Result]", resultMsg.subtype);
+          exitCode = 1;
+        }
+      }
+      if ('session_id' in message && typeof (message as Record<string, unknown>).session_id === 'string') {
+        newSessionId = (message as Record<string, unknown>).session_id as string;
+      }
+    }
+
+    if (pauseReason === 'human_in_the_loop') {
+      return {
+        status: "paused",
+        exitCode: 0,
+        branch: branchName,
+        project: config.name,
+        sessionId: newSessionId ?? resumeSessionId,
+      };
+    }
+
+    if (hasPipeline) await postPipelineEvent(eventConfig, "completed", "orchestrator");
+  } catch (error) {
+    exitCode = 1;
+    if (timedOut) {
+      failureReason = `Timeout nach ${Math.round(timeoutMs / 60_000)} Minuten`;
+    } else {
+      failureReason = error instanceof Error ? error.message : String(error);
+    }
+    console.error(`Resume pipeline error: ${failureReason}`);
+    if (hasPipeline) await postPipelineEvent(eventConfig, "pipeline_failed", "orchestrator");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  return {
+    status: exitCode === 0 ? "completed" : "failed",
+    exitCode,
+    branch: branchName,
+    project: config.name,
+    failureReason,
+    sessionId: newSessionId ?? resumeSessionId,
+  };
+}
+
+// --- CLI entry point (only runs when executed directly) ---
+// Wrapped in async IIFE to avoid top-level await (breaks CJS imports from worker.ts)
+const isMain = process.argv[1]?.endsWith("run.ts");
+if (isMain) {
+  (async () => {
+    const projectDir = process.cwd();
+    const ticket = parseCliArgs(process.argv.slice(2));
+    const config = loadProjectConfig(projectDir);
+
+    // --- Banner ---
+    console.error("================================================");
+    console.error(`  ${config.name} — Autonomous Pipeline (SDK)`);
+    console.error(`  Ticket: ${ticket.ticketId} — ${ticket.title}`);
+    console.error("================================================\n");
+
+    const result = await executePipeline({ projectDir, ticket });
+
+    // --- JSON output (stdout, for n8n / worker) ---
+    console.error("\n================================================");
+    console.error(`  Pipeline ${result.status}`);
+    console.error("================================================");
+
+    console.log(JSON.stringify({
+      status: result.status,
+      ...(result.status === "failed" ? { exit_code: result.exitCode } : {}),
+      ticket_id: ticket.ticketId,
+      ticket_title: ticket.title,
+      branch: result.branch,
+      project: result.project,
+    }));
+
+    if (result.status === "failed") process.exit(result.exitCode);
+  })();
+}
