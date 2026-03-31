@@ -42,7 +42,7 @@ Siehe `knowledge/` für das zentrale Unternehmenswissen:
 ### Workflow für neue Wissensinhalte
 1. Datei in `knowledge/_inbox/` ablegen **oder** Inhalt direkt in den Chat einfügen
 2. Claude liest, analysiert und extrahiert das Kernwissen
-3. Erkenntnisse werden auf **mehrere Dateien verteilt** — jede Information landet in der thematisch passenden Datei
+3. Erkenntnisse werden nach Thema in die passenden Zieldateien eingeordnet — nicht als neue Datei pro Dokument, sondern als Inhalt in die bestehenden Kategorien
 4. Original-Datei wird nach `knowledge/assets/` verschoben
 
 ### Kategorisierungsregeln (strikt einhalten)
