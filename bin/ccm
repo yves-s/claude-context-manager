@@ -52,6 +52,11 @@ cmd_init() {
     cp -r "$TEMPLATES_DIR/meta/context" .
   fi
 
+  # knowledge/ — only copy if not already present (idempotency)
+  if [[ ! -d "knowledge" ]]; then
+    cp -r "$TEMPLATES_DIR/meta/knowledge" .
+  fi
+
   # CLAUDE.md — generate from template, or merge if already exists
   NEW_META=$(sed \
     -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
@@ -91,7 +96,7 @@ cmd_init() {
 
   # Auto-commit generated files
   REMOTE_URL=""
-  git add CLAUDE.md ccm.json context/ .github/
+  git add CLAUDE.md ccm.json context/ knowledge/ .github/
   if git diff --cached --quiet; then
     CCM_COMMIT_STATUS="— keine Änderungen"
     CCM_PUSH_STATUS="— übersprungen"
