@@ -351,22 +351,94 @@ _hooks_install() {
   echo "Starte Claude Code neu um die Hooks zu aktivieren."
 }
 
+cmd_self_update() {
+  INSTALL_URL="https://raw.githubusercontent.com/${CCM_REPO}/main/install.sh"
+  echo "→ Aktualisiere ccm von $CCM_REPO ..."
+  if ! curl -fsSL "$INSTALL_URL" | bash; then
+    echo "❌ Update fehlgeschlagen."
+    exit 1
+  fi
+}
+
+cmd_update() {
+  # Must be run inside a meta-repo (ccm.json present)
+  if [[ ! -f "ccm.json" ]]; then
+    echo "❌ Kein Meta-Repo gefunden (ccm.json fehlt)."
+    echo "   Führe 'ccm update' im Meta-Repo-Verzeichnis aus."
+    exit 1
+  fi
+
+  PROJECT_NAME=$(jq -r '.project'     ccm.json)
+  GITHUB_USER=$(jq  -r '.github_user' ccm.json)
+  META_REPO_URL=$(jq -r '.meta_repo'  ccm.json)
+
+  # 1. CLAUDE.md — merge latest template into existing file
+  NEW_META=$(sed \
+    -e "s|{{PROJECT_NAME}}|$PROJECT_NAME|g" \
+    -e "s|{{GITHUB_USER}}|$GITHUB_USER|g" \
+    -e "s|{{META_REPO_URL}}|$META_REPO_URL|g" \
+    "$TEMPLATES_DIR/meta/CLAUDE.md")
+  MARKER="<!-- PROJECT CONTEXT BELOW -->"
+  if grep -q "$MARKER" "CLAUDE.md"; then
+    echo "$NEW_META" > /tmp/ccm_meta_new.md
+    bash "$LIB_DIR/merge.sh" /tmp/ccm_meta_new.md "CLAUDE.md" "$MARKER"
+    rm -f /tmp/ccm_meta_new.md
+  else
+    echo "$NEW_META" > CLAUDE.md
+  fi
+
+  # 2. knowledge/ — add missing subdirs from template (idempotent)
+  if [[ -d "$TEMPLATES_DIR/meta/knowledge" ]]; then
+    for dir in "$TEMPLATES_DIR/meta/knowledge"/*/; do
+      subdir=$(basename "$dir")
+      if [[ ! -d "knowledge/$subdir" ]]; then
+        cp -r "$dir" "knowledge/$subdir"
+        echo "   + knowledge/$subdir"
+      fi
+    done
+    # _inbox is a special case (named with underscore, glob may skip it)
+    if [[ -d "$TEMPLATES_DIR/meta/knowledge/_inbox" && ! -d "knowledge/_inbox" ]]; then
+      cp -r "$TEMPLATES_DIR/meta/knowledge/_inbox" "knowledge/_inbox"
+      echo "   + knowledge/_inbox"
+    fi
+  fi
+
+  # 3. Commit changes if any
+  git add CLAUDE.md knowledge/ 2>/dev/null || true
+  if git diff --cached --quiet; then
+    echo "✅ Bereits aktuell — keine Änderungen."
+  else
+    git commit -m "chore: update CCM meta-repo to latest template"
+    REMOTE_URL=$(git remote get-url origin 2>/dev/null || true)
+    if [[ -n "$REMOTE_URL" ]]; then
+      git push
+      echo "✅ Meta-Repo aktualisiert und gepushed."
+    else
+      echo "✅ Meta-Repo aktualisiert (kein Remote — nur lokal committed)."
+    fi
+  fi
+}
+
 case "${1:-}" in
-  init)    cmd_init ;;
-  add)     cmd_add ;;
-  invite)  cmd_invite ;;
-  flush)   cmd_flush ;;
-  hooks)   cmd_hooks "${2:-}" ;;
-  version) echo "ccm $CCM_VERSION" ;;
+  init)        cmd_init ;;
+  add)         cmd_add ;;
+  invite)      cmd_invite ;;
+  flush)       cmd_flush ;;
+  hooks)       cmd_hooks "${2:-}" ;;
+  self-update) cmd_self_update ;;
+  update)      cmd_update ;;
+  version)     echo "ccm $CCM_VERSION" ;;
   *)
     echo "Usage: ccm <command>"
     echo ""
     echo "Commands:"
-    echo "  init     Meta-Repo im aktuellen Verzeichnis einrichten"
-    echo "  add      Dieses Projekt als Sub-Repo registrieren"
-    echo "  invite   Team-Einladungsbefehl generieren"
-    echo "  flush    Buffer klassifizieren und in Memory/Meta-Repo schreiben"
-    echo "  hooks    Hook-Management (install)"
-    echo "  version  Version anzeigen"
+    echo "  init          Meta-Repo im aktuellen Verzeichnis einrichten"
+    echo "  add           Dieses Projekt als Sub-Repo registrieren"
+    echo "  invite        Team-Einladungsbefehl generieren"
+    echo "  flush         Buffer klassifizieren und in Memory/Meta-Repo schreiben"
+    echo "  hooks         Hook-Management (install)"
+    echo "  update        Meta-Repo mit neuestem CCM-Template aktualisieren"
+    echo "  self-update   CCM global aktualisieren (binary + templates)"
+    echo "  version       Version anzeigen"
     ;;
 esac

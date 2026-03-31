@@ -67,6 +67,14 @@ for f in CLAUDE.md dot-ccm; do
   curl -fsSL "$CCM_RAW/templates/sub/$f" -o "$HOME/.ccm/templates/sub/$f"
 done
 
+mkdir -p "$HOME/.ccm/templates/meta/knowledge/"{brand,marketing,customers,assets,_inbox}
+for dir in brand marketing customers assets; do
+  curl -fsSL "$CCM_RAW/templates/meta/knowledge/$dir/.gitkeep" \
+    -o "$HOME/.ccm/templates/meta/knowledge/$dir/.gitkeep" 2>/dev/null || true
+done
+curl -fsSL "$CCM_RAW/templates/meta/knowledge/_inbox/README.md" \
+  -o "$HOME/.ccm/templates/meta/knowledge/_inbox/README.md"
+
 # Detect shell config file (used by both PATH blocks below)
 SHELL_NAME=$(basename "$SHELL")
 case "$SHELL_NAME" in
