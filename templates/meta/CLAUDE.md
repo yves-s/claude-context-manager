@@ -42,8 +42,23 @@ Siehe `knowledge/` für das zentrale Unternehmenswissen:
 ### Workflow für neue Wissensinhalte
 1. Datei in `knowledge/_inbox/` ablegen **oder** Inhalt direkt in den Chat einfügen
 2. Claude liest, analysiert und extrahiert das Kernwissen
-3. Strukturiertes Markdown wird in den richtigen Ordner geschrieben
+3. Erkenntnisse werden auf **mehrere Dateien verteilt** — jede Information landet in der thematisch passenden Datei
 4. Original-Datei wird nach `knowledge/assets/` verschoben
+
+### Kategorisierungsregeln (strikt einhalten)
+
+Ein Dokument kann Erkenntnisse für **mehrere** Ordner liefern. Niemals alles in eine Datei schreiben.
+
+| Inhalt | Zieldatei |
+|--------|-----------|
+| Originale Zitate von Kunden | `customers/reviews.md` |
+| Produkt-Ratings, Bewertungsübersicht | `customers/reviews.md` |
+| Wer sind unsere Kunden, Pain Points | `customers/personas.md` |
+| Sprache die funktioniert, Hooks, Einwände | `marketing/insights.md` |
+| Kanal-Erkenntnisse, ROAS, Performance | `marketing/insights.md` |
+| Analyse erfolgreicher Ads | `marketing/winning-ads/[kanal].md` |
+| Logo, Farben, Schriften, Bildsprache | `brand/styleguide.md` oder `brand/colors-fonts.md` |
+| Ton, Stimme, Wortwahl | `brand/tonality.md` |
 
 ### Session-Start: Inbox prüfen
 Bei jeder neuen Session: Prüfe ob `knowledge/_inbox/` Dateien enthält.
